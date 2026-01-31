@@ -29,9 +29,15 @@ export default function AdminProducts() {
     const fetchProducts = async () => {
         setLoading(true);
         try {
-            const res = await fetch('/api/products?limit=100');
+            // Add timestamp to prevent caching
+            const res = await fetch(`/api/products?limit=100&t=${Date.now()}`, {
+                headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
+            });
             const data = await res.json();
-            if (data.products) setProducts(data.products);
+            if (data.products) {
+                setProducts(data.products);
+                console.log("Fetched products:", data.products.length);
+            }
         } catch (error) {
             console.error("Failed to fetch products", error);
             toast.error("Failed to load products");
@@ -63,12 +69,17 @@ export default function AdminProducts() {
         fetchProducts(); // Refresh list
     };
 
-    if (loading && !products.length) return <div className="p-8"><Loader2 className="animate-spin" /> Loading products...</div>;
+    if (loading && !products.length) return <div className="p-8 flex items-center gap-2"><Loader2 className="animate-spin" /> Loading products...</div>;
 
     return (
         <div className="p-8 space-y-6">
             <div className="flex justify-between items-center">
-                <h1 className="text-3xl font-serif font-bold">Products</h1>
+                <div className="flex items-center gap-4">
+                    <h1 className="text-3xl font-serif font-bold">Products ({products.length})</h1>
+                    <Button variant="outline" size="sm" onClick={fetchProducts} disabled={loading}>
+                        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Refresh"}
+                    </Button>
+                </div>
                 {!isAdding && !editingProduct && (
                     <Button onClick={() => setIsAdding(true)}>
                         <Plus className="w-4 h-4 mr-2" /> Add Product
