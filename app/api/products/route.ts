@@ -8,7 +8,9 @@ export async function GET(request: NextRequest) {
         const { searchParams } = new URL(request.url);
         const admin = await isAdmin();
 
+        // Use Admin Client if admin to bypass RLS completely
         if (admin) {
+            console.log("Admin requesting products: Switching to Service Role Client");
             const { createSupabaseAdmin } = await import('@/lib/supabase/server');
             supabase = createSupabaseAdmin();
         }
@@ -24,19 +26,16 @@ export async function GET(request: NextRequest) {
         let query = supabase
             .from('products')
             .select(`
-        *,
-        category:categories(*),
-        images:product_images(*, order:display_order.asc),
-        sizes:product_sizes(*)
-      `);
+                *,
+                category:categories(*),
+                images:product_images(*, order:display_order.asc),
+                sizes:product_sizes(*)
+             `, { count: 'exact' });
 
-        // Only fitler active products for non-admins
+        // For non-admins, force active only (RLS should handle this, but being explicit is safe)
         if (!admin) {
             query = query.eq('is_active', true);
         }
-
-        query = query.order(sortBy, { ascending: order })
-            .range(offset, offset + limit - 1);
 
         // Filter by category
         if (category) {
@@ -56,6 +55,9 @@ export async function GET(request: NextRequest) {
             query = query.ilike('name', `%${search}%`);
         }
 
+        query = query.order(sortBy, { ascending: order })
+            .range(offset, offset + limit - 1);
+
         const { data: products, error, count } = await query;
 
         if (error) {
@@ -63,12 +65,14 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: error.message }, { status: 500 });
         }
 
+        console.log(`Fetch success: ${products?.length} products found. (Admin: ${admin})`);
+
         return NextResponse.json({
-            products,
+            products: products || [],
             pagination: {
                 limit,
                 offset,
-                total: count
+                total: count || 0
             }
         });
     } catch (error) {
@@ -81,9 +85,10 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
     try {
         await requireAdmin();
-        const supabase = await createSupabaseServerClient();
-        const body = await request.json();
+        console.log("Starting Product Creation...");
 
+        // Parse Body
+        const body = await request.json();
         const {
             slug,
             name,
@@ -102,17 +107,20 @@ export async function POST(request: NextRequest) {
             sizes = []
         } = body;
 
-        // Validate required fields
+        // Validation
         if (!slug || !name || !price) {
+            console.error("Missing required fields:", { slug, name, price });
             return NextResponse.json(
                 { error: 'Missing required fields: slug, name, price' },
                 { status: 400 }
             );
         }
 
-        // Create product using Admin Client to bypass RLS
+        // Use Service Role Client for INSERT to bypass RLS
         const { createSupabaseAdmin } = await import('@/lib/supabase/server');
         const supabaseAdmin = createSupabaseAdmin();
+
+        console.log("Inserting product into DB...", { slug, name, is_active });
 
         const { data: product, error: productError } = await supabaseAdmin
             .from('products')
@@ -120,7 +128,7 @@ export async function POST(request: NextRequest) {
                 slug,
                 name,
                 description,
-                category_id,
+                category_id, // Ensure this is UUID or null
                 price,
                 discount_price,
                 discount_type,
@@ -136,9 +144,11 @@ export async function POST(request: NextRequest) {
             .single();
 
         if (productError) {
-            console.error('Product creation error:', productError);
-            return NextResponse.json({ error: productError.message }, { status: 500 });
+            console.error('Product creation error (Supabase):', productError);
+            return NextResponse.json({ error: `Database Error: ${productError.message}` }, { status: 500 });
         }
+
+        console.log("Product inserted successfully:", product.id);
 
         // Create sizes if provided
         if (sizes.length > 0) {
@@ -154,27 +164,33 @@ export async function POST(request: NextRequest) {
 
             if (sizesError) {
                 console.error('Sizes creation error:', sizesError);
+                // We don't fail the whole request but we log it
             }
         }
 
-        // Fetch complete product with relations
-        const { data: fullProduct } = await supabase
+        // Fetch complete product with relations for immediate return
+        const { data: fullProduct, error: fetchError } = await supabaseAdmin
             .from('products')
             .select(`
-        *,
-        category:categories(*),
-        images:product_images(*),
-        sizes:product_sizes(*)
-      `)
+                *,
+                category:categories(*),
+                images:product_images(*),
+                sizes:product_sizes(*)
+            `)
             .eq('id', product.id)
             .single();
 
-        return NextResponse.json({ product: fullProduct }, { status: 201 });
-    } catch (error) {
-        if (error instanceof Error && error.message === 'Forbidden: Admin access required') {
+        if (fetchError) {
+            console.error("Error fetching created product:", fetchError);
+        }
+
+        return NextResponse.json({ product: fullProduct || product }, { status: 201 });
+
+    } catch (error: any) {
+        if (error.message === 'Forbidden: Admin access required') {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
         }
-        console.error('Products API error:', error);
-        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+        console.error('Products API error (Unknown):', error);
+        return NextResponse.json({ error: `Server Error: ${error.message}` }, { status: 500 });
     }
 }
