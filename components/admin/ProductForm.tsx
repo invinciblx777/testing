@@ -111,17 +111,18 @@ export default function ProductForm({ initialData, onSuccess, onCancel }: Produc
             const method = initialData ? 'PUT' : 'POST';
 
             // 1. Create/Update Product
+            // 1. Create/Update Product
             const slug = initialData?.slug || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') + '-' + Date.now();
             const productBody = {
                 name,
                 slug,
-                category_id: categoryId,
+                category_id: categoryId || null,
                 description,
                 price: parseFloat(price),
                 discount_price: discountPrice ? parseFloat(discountPrice) : null,
-                stock_total: parseInt(stockTotal),
-                stock_remaining: parseInt(stockRemaining),
-                sizes: sizes.map(s => ({ size: s, stock: Math.floor(parseInt(stockRemaining) / sizes.length) || 0 })), // Naive distribution
+                stock_total: parseInt(stockTotal + ''),
+                stock_remaining: parseInt(stockRemaining + ''),
+                sizes: sizes.map(s => ({ size: s, stock: Math.floor((parseInt(stockRemaining + '') || 0) / (sizes.length || 1)) })),
                 is_active: true
             };
 

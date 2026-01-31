@@ -110,8 +110,11 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Create product
-        const { data: product, error: productError } = await supabase
+        // Create product using Admin Client to bypass RLS
+        const { createSupabaseAdmin } = await import('@/lib/supabase/server');
+        const supabaseAdmin = createSupabaseAdmin();
+
+        const { data: product, error: productError } = await supabaseAdmin
             .from('products')
             .insert({
                 slug,
@@ -145,7 +148,7 @@ export async function POST(request: NextRequest) {
                 stock_count: s.stock_count || 0
             }));
 
-            const { error: sizesError } = await supabase
+            const { error: sizesError } = await supabaseAdmin
                 .from('product_sizes')
                 .insert(sizeRecords);
 
