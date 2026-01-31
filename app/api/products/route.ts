@@ -25,14 +25,9 @@ export async function GET(request: NextRequest) {
 
         let query = supabase
             .from('products')
-            .select(`
-                *,
-                category:categories(*),
-                images:product_images(*, order:display_order.asc),
-                sizes:product_sizes(*)
-             `, { count: 'exact' });
+            .select('*', { count: 'exact' });
 
-        // For non-admins, force active only (RLS should handle this, but being explicit is safe)
+        // For non-admins, force active only
         if (!admin) {
             query = query.eq('is_active', true);
         }
