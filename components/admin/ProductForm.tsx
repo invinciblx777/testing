@@ -111,8 +111,10 @@ export default function ProductForm({ initialData, onSuccess, onCancel }: Produc
             const method = initialData ? 'PUT' : 'POST';
 
             // 1. Create/Update Product
+            const slug = initialData?.slug || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') + '-' + Date.now();
             const productBody = {
                 name,
+                slug,
                 category_id: categoryId,
                 description,
                 price: parseFloat(price),
