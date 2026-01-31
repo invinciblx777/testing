@@ -31,6 +31,20 @@ export async function createSupabaseServerClient() {
     );
 }
 
+export function createSupabaseAdmin() {
+    return createServerClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        {
+            cookies: {
+                get(name: string) { return '' },
+                set(name: string, value: string, options: CookieOptions) { },
+                remove(name: string, options: CookieOptions) { },
+            },
+        }
+    );
+}
+
 // Helper to check if user is admin
 export async function isAdmin() {
     const supabase = await createSupabaseServerClient();

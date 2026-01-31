@@ -4,9 +4,14 @@ import { createSupabaseServerClient, requireAdmin, isAdmin } from '@/lib/supabas
 // GET /api/products - List all products (public)
 export async function GET(request: NextRequest) {
     try {
-        const supabase = await createSupabaseServerClient();
+        let supabase = await createSupabaseServerClient();
         const { searchParams } = new URL(request.url);
         const admin = await isAdmin();
+
+        if (admin) {
+            const { createSupabaseAdmin } = await import('@/lib/supabase/server');
+            supabase = createSupabaseAdmin();
+        }
 
         // Query parameters
         const category = searchParams.get('category');
