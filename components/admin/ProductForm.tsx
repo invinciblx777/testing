@@ -132,9 +132,14 @@ export default function ProductForm({ initialData, onSuccess, onCancel }: Produc
                 body: JSON.stringify(productBody)
             });
 
-            if (!res.ok) throw new Error("Failed to save product");
             const data = await res.json();
-            const productId = data.product.id;
+
+            if (!res.ok) {
+                // Display actual error from server
+                throw new Error(data.error || `Server Error (${res.status})`);
+            }
+
+            const productId = data.product?.id;
 
             // 2. Upload New Images
             if (newImages.length > 0) {
