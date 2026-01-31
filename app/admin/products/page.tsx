@@ -1,68 +1,69 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Product } from "@/data/products";
 import { formatPrice } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Plus, Edit, Trash, EyeOff } from "lucide-react";
-import { useProductStore } from "@/lib/store";
+import { Plus, Edit, Trash, EyeOff, Loader2 } from "lucide-react";
 import ProductForm from "@/components/admin/ProductForm";
+import { toast } from "sonner";
+
+// Define matching types
+interface Product {
+    id: string;
+    name: string;
+    category: any;
+    price: number;
+    discount_price?: number;
+    stock_remaining: number;
+    is_active: boolean;
+    images: { image_url: string }[];
+}
 
 export default function AdminProducts() {
-    // 1. Get state and actions from the store
-    const { products, addProduct, deleteProduct, toggleStock: toggleStockStore, updateProduct } = useProductStore();
-    const [hydrated, setHydrated] = useState(false);
+    const [products, setProducts] = useState<Product[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [isAdding, setIsAdding] = useState(false);
+    const [editingProduct, setEditingProduct] = useState<any>(null);
 
-    // 2. Handle hydration
+    // Fetch Products
+    const fetchProducts = async () => {
+        setLoading(true);
+        try {
+            const res = await fetch('/api/products?limit=100');
+            const data = await res.json();
+            if (data.products) setProducts(data.products);
+        } catch (error) {
+            console.error("Failed to fetch products", error);
+            toast.error("Failed to load products");
+        } finally {
+            setLoading(false);
+        }
+    };
+
     useEffect(() => {
-        useProductStore.persist.rehydrate();
-        setHydrated(true);
+        fetchProducts();
     }, []);
 
-    const [isAdding, setIsAdding] = useState(false);
-    const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-    const [formKey, setFormKey] = useState(0);
+    const handleDelete = async (id: string) => {
+        if (!confirm("Are you sure you want to delete this product?")) return;
 
-    const handleSave = (data: Product) => {
-        if (editingProduct) {
-            updateProduct(data);
-            setEditingProduct(null);
-            setIsAdding(true); // Switch back to Add mode
-        } else {
-            addProduct(data);
-            // Keep adding mode open
+        try {
+            const res = await fetch(`/api/products/${id}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error("Failed to delete");
+            toast.success("Product deleted");
+            fetchProducts();
+        } catch (error) {
+            toast.error("Error deleting product");
         }
-        // Force form reset by changing key
-        setFormKey(prev => prev + 1);
-        // Optional: Scroll to top
-        window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
-    const handleEdit = (product: Product) => {
-        setEditingProduct(product);
-        setIsAdding(false);
-        // Scroll to top to see form
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    };
-
-    const handleCancel = () => {
+    const handleSave = () => {
         setIsAdding(false);
         setEditingProduct(null);
+        fetchProducts(); // Refresh list
     };
 
-    const handleDelete = (id: string) => {
-        if (confirm("Are you sure you want to delete this product?")) {
-            deleteProduct(id);
-        }
-    }
-
-    const toggleStock = (id: string) => {
-        toggleStockStore(id);
-    }
-
-    if (!hydrated) {
-        return <div className="p-8">Loading products...</div>;
-    }
+    if (loading && !products.length) return <div className="p-8"><Loader2 className="animate-spin" /> Loading products...</div>;
 
     return (
         <div className="p-8 space-y-6">
@@ -75,93 +76,84 @@ export default function AdminProducts() {
                 )}
             </div>
 
-            {/* PRODUCT FORM (ADD / EDIT) */}
             {(isAdding || editingProduct) && (
                 <ProductForm
-                    key={editingProduct ? editingProduct.id : `new-${formKey}`}
-                    initialData={editingProduct || undefined}
-                    onSubmit={handleSave}
-                    onCancel={handleCancel}
+                    initialData={editingProduct}
+                    onSuccess={handleSave}
+                    onCancel={() => { setIsAdding(false); setEditingProduct(null); }}
                 />
             )}
 
-            <div className="bg-background rounded-lg border border-border overflow-hidden shadow-sm">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-sm text-left min-w-[600px] md:min-w-full">
-                        <thead className="bg-muted/50 text-muted-foreground font-medium border-b border-border">
-                            <tr>
-                                <th className="px-6 py-3">Product</th>
-                                <th className="px-6 py-3 hidden md:table-cell">Category</th>
-                                <th className="px-6 py-3">Price</th>
-                                <th className="px-6 py-3 hidden md:table-cell">Stock</th>
-                                <th className="px-6 py-3 text-right">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border">
-                            {products.map(product => {
-                                const isLowStock = product.stockRemaining <= 5 && product.inStock;
-                                return (
-                                    <tr key={product.id} className="hover:bg-muted/10">
-                                        <td className="px-6 py-4 font-medium text-foreground flex items-center gap-3">
-                                            {/* Preview Image in Table */}
-                                            <div className="w-10 h-10 rounded bg-muted overflow-hidden relative border border-border shrink-0">
-                                                {/* Display image if available, else placeholder */}
-                                                {product.images[0] ? (
-                                                    <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover" />
-                                                ) : (
-                                                    <div className="w-full h-full bg-stone-200" />
-                                                )}
-                                            </div>
-                                            <div className="flex flex-col">
-                                                <span>{product.name}</span>
-                                                {product.stockRemaining !== undefined && (
-                                                    <span className="text-xs text-muted-foreground md:hidden">Qty: {product.stockRemaining}</span>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 capitalize hidden md:table-cell">{product.category}</td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex flex-col">
-                                                {product.discountPrice && product.discountPrice < product.price ? (
-                                                    <>
-                                                        <span className="font-medium">{formatPrice(product.discountPrice)}</span>
-                                                        <span className="text-xs text-muted-foreground line-through">{formatPrice(product.price)}</span>
-                                                    </>
-                                                ) : (
-                                                    formatPrice(product.price)
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 hidden md:table-cell">
-                                            <div className="flex gap-2">
-                                                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${product.inStock ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                                    {product.inStock ? 'In Stock' : 'Out of Stock'}
-                                                </span>
-                                                {isLowStock && (
-                                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700 animate-pulse">
-                                                        Low Stock
+            {!isAdding && !editingProduct && (
+                <div className="bg-background rounded-lg border border-border overflow-hidden shadow-sm">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left min-w-[600px] md:min-w-full">
+                            <thead className="bg-muted/50 text-muted-foreground font-medium border-b border-border">
+                                <tr>
+                                    <th className="px-6 py-3">Product</th>
+                                    <th className="px-6 py-3 hidden md:table-cell">Category</th>
+                                    <th className="px-6 py-3">Price</th>
+                                    <th className="px-6 py-3 hidden md:table-cell">Stock</th>
+                                    <th className="px-6 py-3 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border">
+                                {products.map(product => {
+                                    const inStock = product.stock_remaining > 0;
+                                    const displayImage = product.images?.[0]?.image_url;
+
+                                    return (
+                                        <tr key={product.id} className="hover:bg-muted/10">
+                                            <td className="px-6 py-4 font-medium text-foreground flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded bg-muted overflow-hidden relative border border-border shrink-0">
+                                                    {displayImage ? (
+                                                        <img src={displayImage} alt={product.name} className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        <div className="w-full h-full bg-stone-200" />
+                                                    )}
+                                                </div>
+                                                <div className="flex flex-col">
+                                                    <span>{product.name}</span>
+                                                    <span className="text-xs text-muted-foreground md:hidden">Qty: {product.stock_remaining}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 capitalize hidden md:table-cell">{product.category?.name || '-'}</td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex flex-col">
+                                                    {product.discount_price && product.discount_price < product.price ? (
+                                                        <>
+                                                            <span className="font-medium">{formatPrice(product.discount_price)}</span>
+                                                            <span className="text-xs text-muted-foreground line-through">{formatPrice(product.price)}</span>
+                                                        </>
+                                                    ) : (
+                                                        formatPrice(product.price)
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 hidden md:table-cell">
+                                                <div className="flex gap-2">
+                                                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${inStock ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                                        {inStock ? 'In Stock' : 'Out of Stock'}
                                                     </span>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 text-right space-x-2 whitespace-nowrap">
-                                            <Button variant="ghost" size="icon" onClick={() => toggleStock(product.id)} title="Toggle Stock">
-                                                <EyeOff className="w-4 h-4" />
-                                            </Button>
-                                            <Button variant="ghost" size="icon" onClick={() => handleEdit(product)}>
-                                                <Edit className="w-4 h-4" />
-                                            </Button>
-                                            <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => handleDelete(product.id)}>
-                                                <Trash className="w-4 h-4" />
-                                            </Button>
-                                        </td>
-                                    </tr>
-                                )
-                            })}
-                        </tbody>
-                    </table>
+                                                    <span className="text-sm text-muted-foreground ml-2">({product.stock_remaining})</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-right space-x-2 whitespace-nowrap">
+                                                <Button variant="ghost" size="icon" onClick={() => setEditingProduct(product)}>
+                                                    <Edit className="w-4 h-4" />
+                                                </Button>
+                                                <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => handleDelete(product.id)}>
+                                                    <Trash className="w-4 h-4" />
+                                                </Button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-            </div>
+            )}
         </div>
     );
 }

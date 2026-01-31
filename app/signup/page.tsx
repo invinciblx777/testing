@@ -3,14 +3,17 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
+import { getSupabaseClient } from "@/lib/supabase/client";
+import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
 
 export default function SignupPage() {
     const router = useRouter();
-    const { login } = useStore();
+    const supabase = getSupabaseClient();
+
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
@@ -20,18 +23,30 @@ export default function SignupPage() {
         e.preventDefault();
         setIsLoading(true);
 
-        // Mock signup delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        try {
+            const { error } = await supabase.auth.signUp({
+                email,
+                password,
+                options: {
+                    data: {
+                        full_name: name,
+                    },
+                },
+            });
 
-        // Mock successful signup and login
-        login({
-            name: name,
-            email: email,
-            role: 'customer',
-        });
+            if (error) {
+                toast.error(error.message);
+                return;
+            }
 
-        setIsLoading(false);
-        router.push("/"); // Redirect to home
+            toast.success("Account created! Please check your email/login.");
+            router.refresh();
+            router.push("/login?signup=success"); // Redirect to login or home
+        } catch (error) {
+            toast.error("An unexpected error occurred");
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
@@ -78,6 +93,8 @@ export default function SignupPage() {
                                 id="password"
                                 type="password"
                                 required
+                                // Supabase require min 6 chars usually
+                                minLength={6}
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 className="w-full px-3 py-2 border border-border rounded-md bg-transparent focus:outline-none focus:ring-2 focus:ring-primary/50"
@@ -86,6 +103,7 @@ export default function SignupPage() {
                         </div>
 
                         <Button type="submit" className="w-full text-lg h-12" disabled={isLoading}>
+                            {isLoading ? <Loader2 className="animate-spin mr-2" /> : null}
                             {isLoading ? "Creating Account..." : "Create Account"}
                         </Button>
                     </form>

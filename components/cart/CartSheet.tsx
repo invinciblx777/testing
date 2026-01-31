@@ -5,13 +5,12 @@ import Image from "next/image";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Plus, Minus, Trash2, ShoppingBag } from "lucide-react";
-import { useStore } from "@/lib/store"; // Cart Store
-import { useProductStore } from "@/lib/store"; // Product Data
+import { useStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { formatPrice } from "@/lib/utils";
 import { useIsMobile } from "@/lib/hooks/use-mobile";
-
 import { createPortal } from "react-dom";
+import { Product } from "@/types";
 
 interface CartSheetProps {
     isOpen: boolean;
@@ -20,27 +19,65 @@ interface CartSheetProps {
 
 export function CartSheet({ isOpen, onClose }: CartSheetProps) {
     const { cart, removeFromCart, updateCartItemQuantity } = useStore();
-    const { products } = useProductStore();
     const isMobile = useIsMobile();
     const [hydrated, setHydrated] = useState(false);
+    const [cartProducts, setCartProducts] = useState<Record<string, Product>>({});
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         setHydrated(true);
     }, []);
 
+    // Fetch product details for items in cart
+    useEffect(() => {
+        if (!isOpen) return;
+
+        const fetchCartProducts = async () => {
+            // Collect needed IDs
+            const ids = Array.from(new Set(cart.map(item => item.productId)));
+            if (ids.length === 0) return;
+
+            // Optimization: don't refetch if we have them
+            const missingIds = ids.filter(id => !cartProducts[id]);
+            if (missingIds.length === 0) return;
+
+            setLoading(true);
+            try {
+                // Fetch full list (inefficient but works for now)
+                // TODO: Implement batch fetch
+                const res = await fetch('/api/products?limit=100');
+                const data = await res.json();
+                if (data.products) {
+                    const newMap = { ...cartProducts };
+                    data.products.forEach((p: Product) => {
+                        if (ids.includes(p.id)) {
+                            newMap[p.id] = p;
+                        }
+                    });
+                    setCartProducts(newMap);
+                }
+            } catch (e) {
+                console.error("Cart fetch error", e);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchCartProducts();
+    }, [isOpen, cart]);
+
     if (!hydrated) return null;
 
-    // Filter products that are in the cart
     const cartItems = cart.map(item => {
-        const product = products.find(p => p.id === item.productId);
+        const product = cartProducts[item.productId];
         return {
             ...item,
             product,
         };
-    }).filter(item => item.product);
+    }); // We keep items even if product load fails, but UI handles undefined
 
     const subtotal = cartItems.reduce((total, item) => {
-        const price = item.product?.discountPrice || item.product?.price || 0;
+        const price = item.product?.discount_price || item.product?.price || 0;
         return total + (price * item.quantity);
     }, 0);
 
@@ -88,19 +125,25 @@ export function CartSheet({ isOpen, onClose }: CartSheetProps) {
                                 cartItems.map((item) => (
                                     <div key={`${item.productId}-${item.size}`} className="flex gap-4 p-4 bg-muted/30 rounded-lg border border-border/50">
                                         <div className="relative w-24 h-32 bg-muted rounded-md overflow-hidden flex-shrink-0 border border-border">
-                                            {item.product?.images[0] && (
+                                            {item.product?.images?.[0]?.image_url ? (
                                                 <Image
-                                                    src={item.product.images[0]}
+                                                    src={item.product.images[0].image_url}
                                                     alt={item.product.name}
                                                     fill
                                                     className="object-cover"
                                                 />
+                                            ) : (
+                                                <div className="w-full h-full bg-stone-200 flex items-center justify-center">
+                                                    <span className="text-xs text-stone-500">No Image</span>
+                                                </div>
                                             )}
                                         </div>
                                         <div className="flex-1 flex flex-col justify-between py-1">
                                             <div>
                                                 <div className="flex justify-between items-start gap-2">
-                                                    <h3 className="font-medium text-base leading-tight line-clamp-2">{item.product?.name}</h3>
+                                                    <h3 className="font-medium text-base leading-tight line-clamp-2">
+                                                        {item.product?.name || "Loading Product..."}
+                                                    </h3>
                                                     <button
                                                         onClick={() => removeFromCart(item.productId)}
                                                         className="text-muted-foreground hover:text-red-500 transition-colors p-1 -mr-2 -mt-2"
@@ -110,8 +153,8 @@ export function CartSheet({ isOpen, onClose }: CartSheetProps) {
                                                 </div>
                                                 <p className="text-sm text-muted-foreground mt-1">Size: {item.size}</p>
                                                 <p className="font-medium mt-1">
-                                                    {item.product?.discountPrice
-                                                        ? formatPrice(item.product.discountPrice)
+                                                    {item.product?.discount_price
+                                                        ? formatPrice(item.product.discount_price)
                                                         : formatPrice(item.product?.price || 0)
                                                     }
                                                 </p>
@@ -182,7 +225,7 @@ export function CartSheet({ isOpen, onClose }: CartSheetProps) {
                                             items: cartItems,
                                             email: email
                                         };
-                                        useStore.getState().addOrder(newOrder);
+                                        useStore.getState().addOrder(newOrder); // This adds to local store. Ideally POST /api/orders
                                         useStore.getState().clearCart();
                                         onClose();
                                         alert(`Order placed successfully! Receipt sent to ${email}`);

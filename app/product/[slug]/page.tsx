@@ -8,20 +8,51 @@ import { Footer } from "@/components/layout/Footer";
 import { AnimatePresence, motion } from "framer-motion";
 import { formatPrice, cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Heart, Minus, Plus, Share2, Truck, ShieldCheck, RefreshCw } from "lucide-react";
+import { Heart, Minus, Plus, Truck, ShieldCheck, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
-import { useStore, useProductStore } from "@/lib/store";
+import { useStore } from "@/lib/store";
 import { CustomisationForm } from "@/components/product/CustomisationForm";
+import { Skeleton } from "@/components/ui/skeleton";
+
+interface Product {
+    id: string;
+    slug: string;
+    name: string;
+    description: string;
+    price: number;
+    discount_price?: number;
+    stock_remaining: number;
+    images: { image_url: string }[];
+    sizes: { size: string; stock: number }[];
+    category: { name: string; slug: string };
+}
 
 export default function ProductPage({ params }: { params: Promise<{ slug: string }> }) {
     const { slug } = use(params);
-    const { products } = useProductStore();
-    const [hydrated, setHydrated] = useState(false);
-
+    const [product, setProduct] = useState<Product | null>(null);
+    const [loading, setLoading] = useState(true);
     const { addToCart, addToWishlist, removeFromWishlist, isInWishlist } = useStore();
 
-    // Find product immediately to initialize state if possible, or handle safely
-    const product = products.find((p) => p.slug === slug);
+    // Fetch Product
+    useEffect(() => {
+        async function fetchProduct() {
+            try {
+                const res = await fetch(`/api/products/${slug}`);
+                if (!res.ok) {
+                    if (res.status === 404) return setProduct(null);
+                    throw new Error("Failed to fetch");
+                }
+                const data = await res.json();
+                if (data.product) setProduct(data.product);
+            } catch (error) {
+                console.error(error);
+            } finally {
+                setLoading(false);
+            }
+        }
+        fetchProduct();
+    }, [slug]);
+
     const isWishlisted = product ? isInWishlist(product.id) : false;
 
     const [selectedSize, setSelectedSize] = useState<string | null>(null);
@@ -30,50 +61,35 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
     const [showSticky, setShowSticky] = useState(false);
     const actionsRef = useRef<HTMLDivElement>(null);
 
-    // Scroll Observer to toggle sticky bar
+    // Set active image
     useEffect(() => {
-        if (!hydrated) return;
-
-        const observer = new IntersectionObserver(
-            ([entry]) => {
-                // If actions are visible -> Hide Sticky
-                // If actions are NOT visible -> Show Sticky
-                setShowSticky(!entry.isIntersecting);
-            },
-            { threshold: 0.1 }
-        );
-
-        if (actionsRef.current) {
-            observer.observe(actionsRef.current);
-        }
-
-        return () => observer.disconnect();
-    }, [hydrated]);
-
-    useEffect(() => {
-        useProductStore.persist.rehydrate();
-        setHydrated(true);
-    }, []);
-
-    // Set active image when product is found/hydrated
-    useEffect(() => {
-        if (product && product.images.length > 0) {
-            setActiveImage(product.images[0]);
+        if (product && product.images?.length > 0) {
+            setActiveImage(product.images[0].image_url);
         }
     }, [product]);
 
-    // Show loading state while rehydrating
-    if (!hydrated) {
+    // Scroll Observer
+    useEffect(() => {
+        if (loading) return;
+        const observer = new IntersectionObserver(
+            ([entry]) => setShowSticky(!entry.isIntersecting),
+            { threshold: 0.1 }
+        );
+        if (actionsRef.current) observer.observe(actionsRef.current);
+        return () => observer.disconnect();
+    }, [loading]);
+
+    if (loading) {
         return (
             <div className="min-h-screen bg-background">
                 <Navbar />
                 <main className="container mx-auto px-4 py-8 md:py-12">
                     <div className="flex flex-col md:flex-row gap-12 lg:gap-16">
-                        <div className="w-full md:w-1/2 aspect-[3/4] bg-muted animate-pulse rounded-lg" />
+                        <Skeleton className="w-full md:w-1/2 aspect-[3/4] rounded-lg" />
                         <div className="w-full md:w-1/2 space-y-8">
-                            <div className="h-8 w-3/4 bg-muted animate-pulse rounded" />
-                            <div className="h-4 w-1/2 bg-muted animate-pulse rounded" />
-                            <div className="h-32 w-full bg-muted animate-pulse rounded" />
+                            <Skeleton className="h-8 w-3/4 rounded" />
+                            <Skeleton className="h-4 w-1/2 rounded" />
+                            <Skeleton className="h-32 w-full rounded" />
                         </div>
                     </div>
                 </main>
@@ -81,9 +97,10 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
         );
     }
 
-    if (!product) {
-        notFound();
-    }
+    if (!product) notFound();
+
+    const inStock = product.stock_remaining > 0;
+    const finalPrice = product.discount_price || product.price;
 
     const handleAddToCart = () => {
         if (!selectedSize) {
@@ -99,6 +116,9 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
         else addToWishlist(product.id);
     };
 
+    // Get simple images array for display
+    const displayImages = product.images?.map(img => img.image_url) || [];
+
     return (
         <div className="min-h-screen bg-background/60 backdrop-blur-sm">
             <Navbar />
@@ -108,7 +128,6 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
 
                     {/* IMAGE GALLERY */}
                     <div className="w-full md:w-1/2 space-y-4">
-                        {/* Main Image */}
                         <div className="relative aspect-[4/5] md:aspect-[3/4] bg-secondary/20 rounded-lg overflow-hidden group">
                             {activeImage ? (
                                 <img
@@ -123,10 +142,9 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                             )}
                         </div>
 
-                        {/* Thumbnails */}
-                        {product.images.some(img => img) && (
+                        {displayImages.length > 0 && (
                             <div className="flex gap-4 overflow-x-auto pb-2">
-                                {product.images.filter(img => img).map((img, idx) => (
+                                {displayImages.map((img, idx) => (
                                     <button
                                         key={idx}
                                         onClick={() => setActiveImage(img)}
@@ -135,58 +153,14 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                                             activeImage === img ? "border-primary" : "border-transparent"
                                         )}
                                     >
-                                        <img
-                                            src={img}
-                                            alt={`Product view ${idx + 1}`}
-                                            className="w-full h-full object-cover"
-                                        />
-                                        <span className="sr-only">View image {idx + 1}</span>
+                                        <img src={img} alt={`View ${idx + 1}`} className="w-full h-full object-cover" />
                                     </button>
                                 ))}
                             </div>
                         )}
                     </div>
 
-                    {/* MOVED: Mobile Sticky CTA (Now sits in flow after images on mobile) */}
-                    <div className="md:hidden sticky bottom-4 z-40 px-1 pointer-events-none">
-                        <AnimatePresence>
-                            {showSticky && (
-                                <motion.div
-                                    initial={{ y: 20, opacity: 0 }}
-                                    animate={{ y: 0, opacity: 1 }}
-                                    exit={{ y: 20, opacity: 0 }}
-                                    transition={{ duration: 0.2, ease: "easeInOut" }}
-                                    className="pointer-events-auto"
-                                >
-                                    <div className="flex items-center gap-3 p-3 pl-4 rounded-xl bg-white/80 backdrop-blur-xl border border-white/40 shadow-xl ring-1 ring-black/5">
-                                        <div className="flex flex-col min-w-0 flex-1">
-                                            <span className="text-xs font-medium text-muted-foreground truncate">{product.name}</span>
-                                            <div className="flex items-center gap-1.5">
-                                                <span className="font-bold text-base text-foreground">{formatPrice(product.discountPrice || product.price)}</span>
-                                                {selectedSize && <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-foreground font-medium">{selectedSize}</span>}
-                                            </div>
-                                        </div>
-                                        <Button
-                                            className="shadow-md font-semibold h-10 px-5 rounded-lg bg-primary hover:bg-primary/90 text-white text-sm"
-                                            onClick={() => {
-                                                if (!selectedSize) {
-                                                    document.getElementById('size-selector')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                                    toast.info("Please select a size first");
-                                                } else {
-                                                    handleAddToCart();
-                                                }
-                                            }}
-                                            disabled={!product.inStock}
-                                        >
-                                            {product.inStock ? (selectedSize ? "Add" : "Select") : "No Stock"}
-                                        </Button>
-                                    </div>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-                    </div>
-
-                    {/* PRODUCT INFO */}
+                    {/* DETAILS */}
                     <div className="w-full md:w-1/2 space-y-5 md:space-y-8">
                         <div>
                             <nav className="text-sm text-muted-foreground mb-2 md:mb-4">
@@ -195,11 +169,13 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                             <h1 className="text-2xl md:text-4xl font-serif font-medium text-foreground tracking-tight">{product.name}</h1>
 
                             <div className="mt-4 flex items-center gap-4">
-                                {product.discountPrice ? (
+                                {product.discount_price && product.discount_price < product.price ? (
                                     <div className="text-2xl font-semibold">
-                                        <span className="text-foreground">{formatPrice(product.discountPrice)}</span>
+                                        <span className="text-foreground">{formatPrice(product.discount_price)}</span>
                                         <span className="text-muted-foreground line-through text-lg ml-2 font-normal">{formatPrice(product.price)}</span>
-                                        <span className="text-green-600 text-sm ml-2 font-medium">Save {Math.round(((product.price - product.discountPrice) / product.price) * 100)}%</span>
+                                        <span className="text-green-600 text-sm ml-2 font-medium">
+                                            Save {Math.round(((product.price - product.discount_price) / product.price) * 100)}%
+                                        </span>
                                     </div>
                                 ) : (
                                     <div className="text-2xl font-semibold text-foreground">{formatPrice(product.price)}</div>
@@ -211,34 +187,33 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                             <p>{product.description}</p>
                         </div>
 
-                        {/* Sizes */}
+                        {/* SIZES */}
                         <div id="size-selector">
                             <div className="flex justify-between items-center mb-2">
                                 <span className="font-medium text-sm">Select Size</span>
                                 <button className="text-xs underline text-muted-foreground hover:text-primary">Size Chart</button>
                             </div>
                             <div className="flex gap-3">
-                                {product.sizes.map(size => (
+                                {product.sizes?.map(sizeObj => (
                                     <button
-                                        key={size}
-                                        onClick={() => setSelectedSize(size)}
-                                        disabled={!product.inStock}
+                                        key={sizeObj.size}
+                                        onClick={() => setSelectedSize(sizeObj.size)}
+                                        disabled={!inStock} // Could refine to check size stock if tracked
                                         className={cn(
                                             "w-10 h-10 rounded-full border flex items-center justify-center text-sm transition-all",
-                                            selectedSize === size
+                                            selectedSize === sizeObj.size
                                                 ? "border-primary bg-primary text-white"
                                                 : "border-input hover:border-primary/50",
-                                            !product.inStock && "opacity-50 cursor-not-allowed decoration-slice"
+                                            !inStock && "opacity-50 cursor-not-allowed decoration-slice"
                                         )}
                                     >
-                                        {size}
+                                        {sizeObj.size}
                                     </button>
                                 ))}
                             </div>
-                            {!selectedSize && <p className="text-red-500 text-xs mt-2 h-4"></p>}
                         </div>
 
-                        {/* Actions */}
+                        {/* ACTIONS */}
                         <div ref={actionsRef} className="flex items-center gap-2 md:gap-3 pt-4 border-t border-border">
                             <div className="flex items-center border border-input rounded-md h-10 md:h-14">
                                 <button
@@ -260,52 +235,65 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                                 size="lg"
                                 className="flex-1 h-12 md:h-14 rounded-full bg-gradient-to-r from-primary via-rose-600 to-primary bg-[length:200%_auto] hover:bg-[position:right_center] transition-all duration-500 shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 text-sm md:text-base font-bold tracking-widest uppercase hover:-translate-y-0.5"
                                 onClick={handleAddToCart}
-                                disabled={!product.inStock}
+                                disabled={!inStock}
                             >
-                                {product.inStock ? "Add to Cart" : "Out of Stock"}
+                                {inStock ? "Add to Cart" : "Out of Stock"}
                             </Button>
 
-                            <Button
-                                variant="outline"
-                                size="icon"
-                                className={cn("h-10 w-10 md:h-14 md:w-14 rounded-full border-2 flex-shrink-0", isWishlisted && "text-red-500 border-red-200 bg-red-50")}
-                                onClick={toggleWishlist}
-                            >
+                            <Button variant="outline" size="icon" className={cn("h-10 w-10 md:h-14 md:w-14 rounded-full flex-shrink-0", isWishlisted && "text-red-500 bg-red-50")} onClick={toggleWishlist}>
                                 <Heart className={cn("w-4 h-4 md:w-5 md:h-5", isWishlisted && "fill-current")} />
                             </Button>
                         </div>
 
-                        {/* Features Info */}
+                        {/* FEATURES */}
                         <div className="grid grid-cols-1 gap-4 pt-6">
                             <div className="flex items-center gap-3 text-sm text-foreground/80">
                                 <Truck className="w-5 h-5 text-muted-foreground" />
                                 <span>Free Shipping on orders above ₹999</span>
                             </div>
                             <div className="flex items-center gap-3 text-sm text-foreground/80">
-                                <RefreshCw className="w-5 h-5 text-muted-foreground" />
-                                <span>Easy 7-day Exchange Policy</span>
-                            </div>
-                            <div className="flex items-center gap-3 text-sm text-foreground/80">
                                 <ShieldCheck className="w-5 h-5 text-muted-foreground" />
                                 <span>100% Secure Payment</span>
                             </div>
                             <div className="flex items-center gap-3 text-sm text-foreground/80">
-                                <span className="font-semibold text-red-500">*</span>
-                                <span className="text-xs text-muted-foreground">360 degree opening video must for any issue</span>
+                                <RefreshCw className="w-5 h-5 text-muted-foreground" />
+                                <span>Easy 7-day Exchange Policy</span>
                             </div>
                         </div>
 
-                        {/* Customisation Form */}
                         <CustomisationForm productId={product.id} productName={product.name} />
                     </div>
                 </div>
-
-                {/* Customisation Form */}
-
-
             </main>
 
-
+            {/* STICKY BOTTOM BAR (MOBILE) */}
+            <div className="md:hidden sticky bottom-4 z-40 px-1 pointer-events-none">
+                <AnimatePresence>
+                    {showSticky && (
+                        <motion.div
+                            initial={{ y: 20, opacity: 0 }}
+                            animate={{ y: 0, opacity: 1 }}
+                            exit={{ y: 20, opacity: 0 }}
+                            className="pointer-events-auto"
+                        >
+                            <div className="flex items-center gap-3 p-3 pl-4 rounded-xl bg-white/80 backdrop-blur-xl border border-white/40 shadow-xl ring-1 ring-black/5">
+                                <div className="flex flex-col min-w-0 flex-1">
+                                    <span className="text-xs font-medium text-muted-foreground truncate">{product.name}</span>
+                                    <span className="font-bold text-base text-foreground">{formatPrice(finalPrice)}</span>
+                                </div>
+                                <Button className="shadow-md h-10 px-5 rounded-lg bg-primary text-white text-sm" onClick={() => {
+                                    if (!selectedSize) {
+                                        document.getElementById('size-selector')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                        toast.info("Please select a size");
+                                    } else handleAddToCart();
+                                }} disabled={!inStock}>
+                                    {inStock ? "Add" : "No Stock"}
+                                </Button>
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+            </div>
 
             <Footer />
         </div>

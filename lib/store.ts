@@ -1,31 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-
-interface CartItem {
-    productId: string;
-    size: string;
-    quantity: number;
-}
-
-import { PRODUCTS, CATEGORIES, Product } from '@/data/products';
-
-export interface User {
-    name: string;
-    email: string;
-    role: 'admin' | 'customer';
-}
-
-export interface Order {
-    id: string;
-    date: string;
-    total: number;
-    status: 'Pending' | 'Shipped' | 'In Transit' | 'Delivered' | 'Cancelled';
-    items: CartItem[];
-    email: string;
-    awbId?: string;
-    trackingUrl?: string;
-    timeline?: { status: string; date: string; description: string }[];
-}
+import { CartItem, User, Order } from '@/types';
 
 // --- Customisation Types ---
 export interface CustomisationRequest {
@@ -49,39 +24,27 @@ interface StoreState {
     cart: CartItem[];
     orders: Order[];
     user: User | null;
-    customisationQueries: CustomisationRequest[]; // New array
+    customisationQueries: CustomisationRequest[];
+
     addToWishlist: (productId: string) => void;
     removeFromWishlist: (productId: string) => void;
     isInWishlist: (productId: string) => boolean;
+
     addToCart: (item: CartItem) => void;
     removeFromCart: (productId: string) => void;
     updateCartItemQuantity: (productId: string, quantity: number) => void;
     clearCart: () => void;
+
     addOrder: (order: Order) => void;
     login: (user: User) => void;
     logout: () => void;
+
     // New Actions
     addCustomisationQuery: (query: CustomisationRequest) => void;
     deleteCustomisationQuery: (id: string) => void;
     updateCustomisationStatus: (id: string, status: 'New' | 'In Progress' | 'Closed') => void;
 }
 
-export interface Category {
-    id: string;
-    name: string;
-    image: string;
-}
-
-interface ProductStoreState {
-    products: Product[];
-    categories: Category[];
-    addProduct: (product: Product) => void;
-    deleteProduct: (id: string) => void;
-    toggleStock: (id: string) => void;
-    updateProduct: (product: Product) => void;
-    addCategory: (category: Category) => void;
-    deleteCategory: (id: string) => void;
-}
 
 export const useStore = create<StoreState>()(
     persist(
@@ -141,7 +104,7 @@ export const useStore = create<StoreState>()(
         }),
         {
             name: 'kurtis-boutique-storage',
-            version: 3, // Bump for migration if needed
+            version: 3,
             migrate: (persistedState: any, version: number) => {
                 let state = persistedState;
 
@@ -152,7 +115,6 @@ export const useStore = create<StoreState>()(
                     };
                 }
 
-                // Migration for Order Statuses (v3 fix)
                 if (state.orders) {
                     state.orders = state.orders.map((order: any) => {
                         let newStatus = order.status;
@@ -165,53 +127,6 @@ export const useStore = create<StoreState>()(
                 }
 
                 return state;
-            },
-        }
-    )
-);
-
-export const useProductStore = create<ProductStoreState>()(
-    persist(
-        (set) => ({
-            products: PRODUCTS, // Initialize with mock data
-            categories: CATEGORIES, // Initialize with mock data
-            addProduct: (product) => set((state) => ({
-                products: [product, ...state.products]
-            })),
-            deleteProduct: (id) => set((state) => ({
-                products: state.products.filter(p => p.id !== id)
-            })),
-            toggleStock: (id) => set((state) => ({
-                products: state.products.map(p =>
-                    p.id === id ? { ...p, inStock: !p.inStock } : p
-                )
-            })),
-            updateProduct: (product) => set((state) => ({
-                products: state.products.map(p =>
-                    p.id === product.id ? product : p
-                )
-            })),
-            addCategory: (category) => set((state) => ({
-                categories: [...state.categories, category]
-            })),
-            deleteCategory: (id) => set((state) => ({
-                categories: state.categories.filter(c => c.id !== id)
-            })),
-        }),
-        {
-            name: 'kurtis-boutique-products',
-            skipHydration: true,
-            version: 2,
-            migrate: (persistedState: any, version: number) => {
-                if (version < 2) {
-                    // Reset products and categories to code defaults on migration
-                    return {
-                        ...persistedState,
-                        products: PRODUCTS,
-                        categories: CATEGORIES,
-                    };
-                }
-                return persistedState;
             },
         }
     )

@@ -90,7 +90,7 @@ export function Navbar() {
                             {/* User: Desktop Only (Mobile is on Left) */}
                             {mounted && user ? (
                                 <div className="hidden md:flex items-center gap-2">
-                                    <span className="text-sm font-medium hidden lg:inline-block">Hi, {user.name}</span>
+                                    <span className="text-sm font-medium hidden lg:inline-block">Hi, {user.full_name || user.email}</span>
                                     <Button variant="ghost" size="icon" onClick={() => logout()}>
                                         <UserIcon className="h-5 w-5" />
                                     </Button>

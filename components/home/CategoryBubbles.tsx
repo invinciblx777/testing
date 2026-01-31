@@ -1,23 +1,20 @@
 "use client";
 
 import Link from "next/link";
+import { Category } from "@/types";
 
-import { useProductStore } from "@/lib/store";
-import { cn } from "@/lib/utils";
+interface CategoryBubblesProps {
+    categories: Category[];
+}
 
-export function CategoryBubbles() {
-    const { categories, products } = useProductStore();
-
-    // Only show categories that have products
-    const activeCategories = categories.filter(cat =>
-        products.some(p => p.category === cat.id)
-    );
+export function CategoryBubbles({ categories }: CategoryBubblesProps) {
+    if (!categories || categories.length === 0) return null;
 
     return (
         <div className="w-full border-b border-border/40 bg-gradient-to-b from-white to-transparent py-6">
             <div className="container mx-auto px-4 overflow-x-auto scrollbar-hide">
                 <div className="flex justify-start md:justify-center gap-6 md:gap-10 min-w-max pb-2">
-                    {activeCategories.map((cat) => (
+                    {categories.map((cat) => (
                         <Link
                             key={cat.id}
                             href={`/shop?category=${cat.id}`}
@@ -25,9 +22,9 @@ export function CategoryBubbles() {
                         >
                             <div className="relative p-[2px] rounded-full bg-gradient-to-tr from-primary/20 to-primary/5 group-hover:from-primary group-hover:to-primary/60 transition-all duration-300">
                                 <div className="w-20 h-20 md:w-24 md:h-24 rounded-full border-4 border-background overflow-hidden relative bg-secondary/30">
-                                    {cat.image ? (
+                                    {cat.image_url ? (
                                         <img
-                                            src={cat.image}
+                                            src={cat.image_url}
                                             alt={cat.name}
                                             className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110 mobile-gpu"
                                         />

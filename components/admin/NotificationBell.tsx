@@ -1,18 +1,32 @@
 "use client";
 
-import { useProductStore } from "@/lib/store";
 import { Bell } from "lucide-react";
 import Link from "next/link";
 import { useState, useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
+import { Product } from "@/types";
 
 export function NotificationBell() {
-    const { products } = useProductStore();
+    const [lowStockItems, setLowStockItems] = useState<Product[]>([]);
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
-    // Low stock logic: <= 5 and inStock
-    const lowStockItems = products.filter(p => p.stockRemaining <= 5 && p.inStock);
+    useEffect(() => {
+        // Fetch products to check for low stock
+        // Ideally API could have /api/products/alerts or similar
+        fetch('/api/products?limit=100')
+            .then(res => res.json())
+            .then(data => {
+                if (data.products) {
+                    const low = data.products.filter((p: Product) =>
+                        p.stock_remaining <= 5 && p.is_active
+                    );
+                    setLowStockItems(low);
+                }
+            })
+            .catch(console.error);
+    }, []);
+
     const hasNotifications = lowStockItems.length > 0;
 
     // Close on click outside
@@ -68,7 +82,7 @@ export function NotificationBell() {
                                             <div className="flex justify-between items-start mb-1">
                                                 <p className="text-sm font-medium text-stone-800 line-clamp-1">{product.name}</p>
                                                 <span className="text-xs font-bold text-red-600 bg-red-50 px-1.5 py-0.5 rounded ml-2 whitespace-nowrap">
-                                                    {product.stockRemaining} left
+                                                    {product.stock_remaining} left
                                                 </span>
                                             </div>
                                             <p className="text-xs text-stone-500">

@@ -1,42 +1,37 @@
 "use client";
 
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
-import { useProductStore } from "@/lib/store";
-import { formatPrice } from "@/lib/utils";
-import { Skeleton } from "@/components/ui/skeleton";
-import { LiquidButton } from "@/components/ui/liquid-glass-button";
-
 import { CategoryBubbles } from "@/components/home/CategoryBubbles";
-import { BackgroundGradientAnimation } from "@/components/ui/background-gradient-animation";
 import { HeroBannerCarousel } from "@/components/ui/HeroBannerCarousel";
 import { CircularTestimonialsWrapper } from "@/components/ui/circular-testimonials-wrapper";
 import { NewArrivalsSection } from "@/components/NewArrivalsSection";
 import { useEffect, useState } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Category } from "@/types";
 
 export default function Home() {
-  const { products, categories } = useProductStore();
-  const [hydrated, setHydrated] = useState(false);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    useProductStore.persist.rehydrate();
-    setHydrated(true);
+    fetch('/api/categories')
+      .then(res => res.json())
+      .then(data => {
+        if (data.categories) setCategories(data.categories);
+      })
+      .catch(err => console.error(err))
+      .finally(() => setLoading(false));
   }, []);
-
-  // Use categories from store for grid
-  const displayCategories = categories.filter(cat =>
-    products.some(p => p.category === cat.id)
-  );
 
   return (
     <div className="min-h-screen font-sans selection:bg-primary/20">
       <Navbar />
 
       <main>
-        {/* Category Bubbles */}
-        <CategoryBubbles />
+        {/* Category Bubbles - Pass categories */}
+        <CategoryBubbles categories={categories} />
 
         {/* HERO SECTION */}
         <section className="relative w-full pt-10 pb-40 md:pb-64 bg-white flex flex-col items-center justify-center overflow-visible">
@@ -63,34 +58,37 @@ export default function Home() {
           </div>
 
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-            {(displayCategories || []).map((cat, idx) => (
-              <Link key={cat.id} href={`/shop?category=${cat.id}`} className="group relative aspect-[4/5] overflow-hidden rounded-lg bg-secondary/50">
-                <div className="absolute inset-0 transition-transform duration-700 group-hover:scale-105 bg-stone-300">
-                  {cat.image ? (
-                    <img
-                      src={cat.image}
-                      alt={cat.name}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-stone-200 flex items-center justify-center text-stone-400">
-                      <span className="text-xs">No Image</span>
-                    </div>
-                  )}
-                </div>
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-60 group-hover:opacity-70 transition-opacity" />
-                <div className="absolute bottom-4 left-4 text-white">
-                  <h3 className="font-medium text-lg leading-tight">{cat.name}</h3>
-                </div>
-              </Link>
-            ))}
+            {loading ? (
+              [1, 2, 3, 4, 5].map(i => <Skeleton key={i} className="aspect-[4/5] rounded-lg" />)
+            ) : (
+              categories.map((cat) => (
+                <Link key={cat.id} href={`/shop?category=${cat.id}`} className="group relative aspect-[4/5] overflow-hidden rounded-lg bg-secondary/50">
+                  <div className="absolute inset-0 transition-transform duration-700 group-hover:scale-105 bg-stone-300">
+                    {cat.image_url ? (
+                      <img
+                        src={cat.image_url}
+                        alt={cat.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-stone-200 flex items-center justify-center text-stone-400">
+                        <span className="text-xs">No Image</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-60 group-hover:opacity-70 transition-opacity" />
+                  <div className="absolute bottom-4 left-4 text-white">
+                    <h3 className="font-medium text-lg leading-tight">{cat.name}</h3>
+                  </div>
+                </Link>
+              ))
+            )}
           </div>
         </section>
 
-        {/* NEW ARRIVALS (REPLACING BEST SELLERS) */}
+        {/* NEW ARRIVALS */}
         <NewArrivalsSection />
 
-        {/* FESTIVE HIGHLIGHT */}
         {/* CUSTOMER TESTIMONIALS */}
         <section className="flex justify-center bg-background py-12">
           <CircularTestimonialsWrapper />

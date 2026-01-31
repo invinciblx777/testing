@@ -1,15 +1,10 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Product } from "@/data/products";
 import { ProductCard } from "@/components/shop/ProductCard";
 import { cn } from "@/lib/utils";
-import { useProductStore } from "@/lib/store";
-
-interface NewArrivalsSectionProps {
-    // products: Product[]; // Removed prop
-}
+import { Product } from "@/types";
 
 const TABS = [
     { id: "kurti-coord", label: "Kurthi's / Co-ords" },
@@ -21,33 +16,45 @@ const TABS = [
 ] as const;
 
 export function NewArrivalsSection() {
-    const { products } = useProductStore();
+    const [products, setProducts] = useState<Product[]>([]);
     const [activeTab, setActiveTab] = useState<typeof TABS[number]["id"]>("kurti-coord");
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        // Fetch products. 
+        // Ideally we fetch 'featured' or 'new' items. 
+        // fetching all for client-side filtering for now to match previous logic
+        fetch('/api/products?limit=50&sort=created_at&order=desc')
+            .then(res => res.json())
+            .then(data => {
+                if (data.products) setProducts(data.products);
+            })
+            .catch(console.error)
+            .finally(() => setLoading(false));
+    }, []);
+
 
     const filteredProducts = useMemo(() => {
         return products.filter((product) => {
-            const cat = product.category.toLowerCase();
-            // Logic to map tabs to categories
+            if (!product.category) return false;
+            // Assuming category is an object { name: '...', slug: '...' } or just ID if not joined
+            // My API response joins category.
+            const catName = typeof product.category === 'object' ? product.category.slug : String(product.category || "").toLowerCase();
+            const pName = product.name.toLowerCase();
+
             switch (activeTab) {
                 case "kurti-coord":
-                    return cat === "kurtis" || cat === "aline" || product.name.toLowerCase().includes("co-ord");
+                    return catName === "kurtis" || catName === "aline" || pName.includes("co-ord");
                 case "work-three":
-                    return cat === "workwear" || cat === "sets";
+                    return catName === "workwear" || catName === "sets";
                 case "maxi-casual":
-                    return cat === "maxis" || cat === "daily" || cat === "short" || cat === "dresses";
+                    return catName === "maxis" || catName === "daily" || catName === "short" || catName === "dresses";
                 case "festive":
-                    // Include 'traditional' and 'festive'. Also maybe products with 'festive' in name if category is vague?
-                    return cat === "traditional" || cat === "festive";
+                    return catName === "traditional" || catName === "festive";
                 case "party":
-                    // 'party' isn't a standard category in the provided list, so we map suitable items.
-                    // Maybe 'dresses' or 'festive' or 'maxis' can fit here too if they are fancy?
-                    // For now, let's reuse 'festive' / 'traditional' or specifically look for "party" tags if we had them.
-                    // Let's assume some 'festive' items are also 'party'.
-                    // Or simply fallback to 'traditional' + 'maxis' for variety? 
-                    // Let's filter for items that might be party wear.
-                    return cat === "festive" || cat === "traditional" || (cat === "maxis" && product.price > 1500);
+                    return catName === "festive" || catName === "traditional" || (catName === "maxis" && product.price > 1500);
                 case "tot":
-                    return cat === "tot";
+                    return catName === "tot";
                 default:
                     return false;
             }
@@ -96,28 +103,33 @@ export function NewArrivalsSection() {
 
                 {/* Product Grid */}
                 <div className="min-h-[400px]">
-                    {/* Using AnimatePresence for smooth transitions */}
-                    <motion.div
-                        layout
-                        className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 md:gap-8"
-                    >
-                        <AnimatePresence mode="popLayout">
-                            {filteredProducts.map((product) => (
-                                <motion.div
-                                    key={`${activeTab}-${product.id}`} // Force re-mount for animation per tab switch if needed, or just product.id
-                                    layout
-                                    initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, scale: 0.95 }}
-                                    transition={{ duration: 0.3 }}
-                                >
-                                    <ProductCard product={product} hideWishlist />
-                                </motion.div>
-                            ))}
-                        </AnimatePresence>
-                    </motion.div>
+                    {loading ? (
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            {[1, 2, 3, 4].map(i => <div key={i} className="aspect-[3/4] bg-gray-200 animate-pulse rounded-lg" />)}
+                        </div>
+                    ) : (
+                        <motion.div
+                            layout
+                            className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 md:gap-8"
+                        >
+                            <AnimatePresence mode="popLayout">
+                                {filteredProducts.map((product) => (
+                                    <motion.div
+                                        key={`${activeTab}-${product.id}`}
+                                        layout
+                                        initial={{ opacity: 0, y: 20 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, scale: 0.95 }}
+                                        transition={{ duration: 0.3 }}
+                                    >
+                                        <ProductCard product={product} hideWishlist />
+                                    </motion.div>
+                                ))}
+                            </AnimatePresence>
+                        </motion.div>
+                    )}
 
-                    {filteredProducts.length === 0 && (
+                    {!loading && filteredProducts.length === 0 && (
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}

@@ -3,14 +3,15 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { useStore } from "@/lib/store";
 import Link from "next/link";
-import { toast } from "sonner"; // Assuming sonner is installed as per package.json
+import { toast } from "sonner";
+import { getSupabaseClient } from "@/lib/supabase/client";
 
 export default function AdminLogin() {
     const [loading, setLoading] = useState(false);
-    const { login } = useStore();
     const router = useRouter();
+    const supabase = getSupabaseClient();
+
     const [formData, setFormData] = useState({
         email: "",
         password: ""
@@ -20,26 +21,36 @@ export default function AdminLogin() {
         e.preventDefault();
         setLoading(true);
 
-        // Mock login for frontend-only mode
         try {
-            await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate returning promise
+            const { error: signInError } = await supabase.auth.signInWithPassword({
+                email: formData.email,
+                password: formData.password,
+            });
 
-            // Allow any credentials for now since backend is removed
-            if (formData.email && formData.password) {
-                login({
-                    name: "Admin",
-                    email: formData.email,
-                    role: "admin"
-                });
-                toast.success("Welcome back!");
+            if (signInError) throw signInError;
+
+            // Check if user is admin
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('role')
+                    .eq('id', user.id)
+                    .single();
+
+                if (profile?.role !== 'admin') {
+                    await supabase.auth.signOut();
+                    toast.error("Unauthorized: Admin access only");
+                    return;
+                }
+
+                toast.success("Welcome Admin");
                 router.push("/admin/dashboard");
                 router.refresh();
-            } else {
-                throw new Error("Please enter email and password");
             }
 
         } catch (error: any) {
-            toast.error(error.message);
+            toast.error(error.message || "Failed to login");
         } finally {
             setLoading(false);
         }

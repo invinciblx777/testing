@@ -1,17 +1,25 @@
-
 "use client";
-import { useStore, useProductStore } from "@/lib/store";
+import React, { useEffect, useState } from 'react';
+import { useStore } from "@/lib/store";
 
 export default function AdminDashboard() {
-    // Atomic selectors to prevent re-renders on every store update
     const orders = useStore(state => state.orders || []);
-    const storeProducts = useProductStore(state => state.products || []);
+    const [productsCount, setProductsCount] = useState<number | null>(null);
+
+    useEffect(() => {
+        // Fetch simple stats
+        fetch('/api/products?limit=1')
+            .then(res => res.json())
+            .then(data => {
+                if (data.pagination) setProductsCount(data.pagination.total);
+            })
+            .catch(console.error);
+    }, []);
 
     // Safe date formatter
     const formatDate = (dateString: string) => {
         try {
             const date = new Date(dateString);
-            // Check if date is valid
             if (isNaN(date.getTime())) {
                 return "Invalid Date";
             }
@@ -21,13 +29,9 @@ export default function AdminDashboard() {
         }
     };
 
-    // Calculate dynamic stats safely
     const safeOrders = Array.isArray(orders) ? orders : [];
-    const safeProducts = Array.isArray(storeProducts) ? storeProducts : [];
-
     const totalSales = safeOrders.reduce((sum, order) => sum + (Number(order.total) || 0), 0);
     const activeOrders = safeOrders.filter(o => o.status === 'Pending' || o.status === 'In Transit' || o.status === 'Shipped').length;
-    const productsInStock = safeProducts.filter(p => p.inStock).length;
 
     return (
         <div className="p-8 space-y-8">
@@ -35,9 +39,9 @@ export default function AdminDashboard() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {[
-                    { label: "Total Sales", value: `₹${totalSales.toLocaleString()}`, change: safeOrders.length > 0 ? "Real Data" : "No Sales" },
+                    { label: "Total Sales (Est)", value: `₹${totalSales.toLocaleString()}`, change: safeOrders.length > 0 ? "Local Orders" : "No Data" },
                     { label: "Active Orders", value: activeOrders.toString(), change: "" },
-                    { label: "Products in Stock", value: productsInStock.toString(), change: safeProducts.length > 0 ? "Live" : "Loading..." },
+                    { label: "Total Products", value: productsCount !== null ? productsCount.toString() : "...", change: "Live" },
                 ].map((stat, idx) => (
                     <div key={idx} className="bg-background p-6 rounded-lg border border-border shadow-sm">
                         <p className="text-sm text-muted-foreground font-medium uppercase tracking-wide">{stat.label}</p>
@@ -50,10 +54,11 @@ export default function AdminDashboard() {
             </div>
 
             <div className="bg-background rounded-lg border border-border p-6 min-h-[400px]">
-                <h3 className="text-lg font-medium mb-4">Recent Orders</h3>
+                <h3 className="text-lg font-medium mb-4">Recent Orders (Local Testing)</h3>
+                {/* Note: In real app, this should fetch from /api/orders */}
                 {safeOrders.length === 0 ? (
                     <div className="h-64 flex items-center justify-center text-muted-foreground">
-                        No orders yet. Go to the store and place an order!
+                        No orders yet.
                     </div>
                 ) : (
                     <div className="relative overflow-x-auto">

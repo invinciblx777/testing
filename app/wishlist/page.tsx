@@ -5,19 +5,54 @@ import Link from "next/link";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { ProductCard } from "@/components/shop/ProductCard";
-import { PRODUCTS } from "@/data/products";
 import { useStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
+import { Product } from "@/types";
 
 export default function WishlistPage() {
     const { wishlist } = useStore();
-    const [mounted, setMounted] = useState(false);
+    const [wishlistProducts, setWishlistProducts] = useState<Product[]>([]);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        setMounted(true);
-    }, []);
+        if (wishlist.length === 0) {
+            setWishlistProducts([]);
+            setLoading(false);
+            return;
+        }
 
-    if (!mounted) {
+        // Fetch user's wishlist items
+        // Since we store IDs in local storage, we need to fetch them.
+        // For now, we'll fetch all products and filter locally (not efficient for large DBs but fine for now)
+        // OR better: call an API that accepts IDs. passing IDs in query param ?ids=1,2,3
+
+        const fetchWishlist = async () => {
+            try {
+                // Construct query string with IDs
+                // Note: GET URL length limits exist, but for <50 items it's fine.
+                // For real prod, POST /api/products/batch or similar is better.
+                // Implementing a simple client-side filter after fetching 'all' active products is easiest for short term 
+                // if we don't have a specific batch endpoint.
+                // Let's assume we can fetch all for now or I'll implement a dedicated 'ids' filter in /api/products later if needed.
+
+                const res = await fetch('/api/products?limit=100'); // Get top 100 recent
+                const data = await res.json();
+
+                if (data.products) {
+                    const filtered = data.products.filter((p: Product) => wishlist.includes(p.id));
+                    setWishlistProducts(filtered);
+                }
+            } catch (error) {
+                console.error("Failed to fetch wishlist products", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchWishlist();
+    }, [wishlist]);
+
+    if (loading) {
         return (
             <div className="min-h-screen bg-background/60 backdrop-blur-sm">
                 <Navbar />
@@ -30,8 +65,6 @@ export default function WishlistPage() {
             </div>
         )
     }
-
-    const wishlistProducts = PRODUCTS.filter(p => wishlist.includes(p.id));
 
     return (
         <div className="min-h-screen bg-background/60 backdrop-blur-sm text-foreground">
