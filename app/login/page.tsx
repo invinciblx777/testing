@@ -34,6 +34,24 @@ export default function LoginPage() {
                 return;
             }
 
+            // Fetch profile and update store
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', user.id)
+                    .single();
+
+                const { useStore } = await import("@/lib/store");
+                useStore.getState().login({
+                    id: user.id,
+                    email: user.email!,
+                    full_name: profile?.full_name,
+                    role: profile?.role || 'customer'
+                });
+            }
+
             toast.success("Welcome back!");
             router.refresh();
             router.push("/");

@@ -44,6 +44,15 @@ export default function AdminLogin() {
                     return;
                 }
 
+                // Update Zustand Store
+                const { useStore } = await import("@/lib/store");
+                useStore.getState().login({
+                    id: user.id,
+                    email: user.email!,
+                    full_name: profile.full_name,
+                    role: profile.role
+                });
+
                 toast.success("Welcome Admin");
                 router.push("/admin/dashboard");
                 router.refresh();
