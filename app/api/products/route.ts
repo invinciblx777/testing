@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSupabaseServerClient, requireAdmin } from '@/lib/supabase/server';
+import { createSupabaseServerClient, requireAdmin, isAdmin } from '@/lib/supabase/server';
 
 // GET /api/products - List all products (public)
 export async function GET(request: NextRequest) {
     try {
         const supabase = await createSupabaseServerClient();
         const { searchParams } = new URL(request.url);
+        const admin = await isAdmin();
 
         // Query parameters
         const category = searchParams.get('category');
@@ -22,9 +23,14 @@ export async function GET(request: NextRequest) {
         category:categories(*),
         images:product_images(*, order:display_order.asc),
         sizes:product_sizes(*)
-      `)
-            .eq('is_active', true)
-            .order(sortBy, { ascending: order })
+      `);
+
+        // Only fitler active products for non-admins
+        if (!admin) {
+            query = query.eq('is_active', true);
+        }
+
+        query = query.order(sortBy, { ascending: order })
             .range(offset, offset + limit - 1);
 
         // Filter by category
