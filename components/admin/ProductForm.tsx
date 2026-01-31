@@ -36,11 +36,60 @@ export default function ProductForm({ initialData, onSuccess, onCancel }: Produc
     const [categories, setCategories] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
 
+    // New Category State
+    const [isAddingCategory, setIsAddingCategory] = useState(false);
+    const [newCategoryName, setNewCategoryName] = useState("");
+    const [isCreatingCategory, setIsCreatingCategory] = useState(false);
+
     useEffect(() => {
+        fetchCatergories();
+    }, []);
+
+    const fetchCatergories = () => {
         fetch('/api/categories')
             .then(res => res.json())
             .then(data => setCategories(data.categories || []));
-    }, []);
+    };
+
+    const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const val = e.target.value;
+        if (val === 'new') {
+            setIsAddingCategory(true);
+            setCategoryId("");
+        } else {
+            setCategoryId(val);
+        }
+    };
+
+    const handleCreateCategory = async () => {
+        if (!newCategoryName.trim()) return;
+        setIsCreatingCategory(true);
+        try {
+            const slug = newCategoryName.toLowerCase().replace(/\s+/g, '-');
+            const res = await fetch('/api/categories', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: newCategoryName,
+                    slug: slug,
+                    is_active: true
+                })
+            });
+
+            if (!res.ok) throw new Error("Failed to create category");
+
+            const data = await res.json();
+            toast.success("Category created");
+            await fetchCatergories(); // Refresh list
+            setCategoryId(data.category.id); // Select new category
+            setIsAddingCategory(false);
+            setNewCategoryName("");
+        } catch (error) {
+            toast.error("Failed to create category");
+        } finally {
+            setIsCreatingCategory(false);
+        }
+    };
 
     // Sync stock remaining with total for new products
     useEffect(() => {
@@ -136,15 +185,35 @@ export default function ProductForm({ initialData, onSuccess, onCancel }: Produc
                     </div>
                     <div className="space-y-2">
                         <label className="text-sm font-medium">Category</label>
-                        <select
-                            className="w-full px-3 py-2 border rounded-md"
-                            required
-                            value={categoryId}
-                            onChange={e => setCategoryId(e.target.value)}
-                        >
-                            <option value="">Select Category</option>
-                            {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                        </select>
+                        {isAddingCategory ? (
+                            <div className="flex gap-2">
+                                <input
+                                    type="text"
+                                    className="flex-1 px-3 py-2 border rounded-md"
+                                    placeholder="New Category Name"
+                                    value={newCategoryName}
+                                    onChange={e => setNewCategoryName(e.target.value)}
+                                    autoFocus
+                                />
+                                <Button type="button" onClick={handleCreateCategory} disabled={isCreatingCategory}>
+                                    {isCreatingCategory ? <Loader2 className="w-4 h-4 animate-spin" /> : "Add"}
+                                </Button>
+                                <Button type="button" variant="ghost" onClick={() => { setIsAddingCategory(false); setCategoryId(""); }}>
+                                    <X className="w-4 h-4" />
+                                </Button>
+                            </div>
+                        ) : (
+                            <select
+                                className="w-full px-3 py-2 border rounded-md"
+                                required
+                                value={categoryId}
+                                onChange={handleCategoryChange}
+                            >
+                                <option value="">Select Category</option>
+                                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                <option value="new">+ Add New Category</option>
+                            </select>
+                        )}
                     </div>
                     <div className="space-y-2 md:col-span-2">
                         <label className="text-sm font-medium">Description</label>
