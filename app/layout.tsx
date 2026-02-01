@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Playfair_Display } from "next/font/google";
 import { Toaster } from "sonner";
+import { AuthProvider } from "@/components/providers/AuthProvider";
 import "./globals.css";
 
 const inter = Inter({
@@ -33,13 +34,6 @@ export default function RootLayout({
         <div className="fixed inset-0 -z-10 bg-background pointer-events-none">
           <BackgroundGradientAnimation
             containerClassName="h-full w-full pointer-events-none"
-            // Interactive is true but pointer-events-none on container prevents blocking scrolls
-            // However, we want the "blob" to follow mouse? If pointer-events-none, it won't receive mouse events.
-            // We need to allow mouse events but let clicks pass through? 
-            // "pointer-events-none" on the container stops it from capturing mouse events, so the interactive blob won't move.
-            // If we want interactivity, we need to allow events but be careful not to block content.
-            // Since this is z-index -10, content on z-index 0+ will capture events first. 
-            // So removing pointer-events-none from container should be fine.
             className="absolute inset-0"
             interactive={true}
             firstColor="128, 24, 72"
@@ -51,9 +45,11 @@ export default function RootLayout({
             size="80%"
           />
         </div>
-        <div className="relative z-0">
-          {children}
-        </div>
+        <AuthProvider>
+          <div className="relative z-0">
+            {children}
+          </div>
+        </AuthProvider>
         <Toaster
           position="bottom-right"
           toastOptions={{
@@ -75,3 +71,4 @@ export default function RootLayout({
     </html>
   );
 }
+

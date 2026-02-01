@@ -54,13 +54,17 @@ export function ProductPageClient({ product }: ProductPageClientProps) {
     const finalPrice = product.discount_price || product.price;
     const categoryName = product.category?.name || "Uncategorized";
 
-    const handleAddToCart = () => {
+    const handleAddToCart = async () => {
         if (!selectedSize) {
             toast.error("Please select a size");
             return;
         }
-        addToCart({ productId: product.id, size: selectedSize, quantity });
-        toast.success("Added to Cart");
+        const success = await addToCart(product.id, selectedSize, quantity);
+        if (success) {
+            toast.success("Added to Cart");
+        } else {
+            toast.error("Please login to add to cart");
+        }
     };
 
     const toggleWishlist = () => {
