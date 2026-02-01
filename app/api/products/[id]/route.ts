@@ -15,12 +15,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         let query = supabase
             .from('products')
             .select(`
-        *,
-        category:categories(*),
-        images:product_images(*, order:display_order.asc),
-        sizes:product_sizes(*),
-        reviews:reviews(*)
-      `);
+                *,
+                category:categories(id, name, slug),
+                images:product_images(id, image_url, display_order),
+                sizes:product_sizes(id, size, stock_count),
+                reviews:reviews(id, rating, comment, user_id, created_at)
+            `);
 
         // Check if it's a UUID or slug
         const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);

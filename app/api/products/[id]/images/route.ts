@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSupabaseServerClient, requireAdmin } from '@/lib/supabase/server';
+import { requireAdmin, createSupabaseAdmin } from '@/lib/supabase/server';
 
 interface RouteParams {
     params: Promise<{ id: string }>;
@@ -10,7 +10,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     try {
         await requireAdmin();
         const { id } = await params;
-        const supabase = await createSupabaseServerClient();
+        const supabase = createSupabaseAdmin(); // Use admin client for storage
 
         const formData = await request.formData();
         const file = formData.get('file') as File;
@@ -69,7 +69,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     try {
         await requireAdmin();
         const { id } = await params;
-        const supabase = await createSupabaseServerClient();
+        const supabase = createSupabaseAdmin();
         const { images } = await request.json();
 
         // images should be array of { id, display_order }
@@ -108,7 +108,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     try {
         await requireAdmin();
         const { id } = await params;
-        const supabase = await createSupabaseServerClient();
+        const supabase = createSupabaseAdmin();
 
         const { searchParams } = new URL(request.url);
         const imageId = searchParams.get('imageId');

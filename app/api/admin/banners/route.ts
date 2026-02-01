@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSupabaseServerClient, requireAdmin } from '@/lib/supabase/server';
+import { requireAdmin, createSupabaseAdmin } from '@/lib/supabase/server';
 
 // GET /api/admin/banners - List all banners (admin only)
 export async function GET() {
     try {
         await requireAdmin();
-        const supabase = await createSupabaseServerClient();
+        const supabase = createSupabaseAdmin();
 
         const { data: banners, error } = await supabase
             .from('banners')
@@ -31,7 +31,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
     try {
         await requireAdmin();
-        const supabase = await createSupabaseServerClient();
+        const supabase = createSupabaseAdmin();
 
         const contentType = request.headers.get('content-type') || '';
 

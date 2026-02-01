@@ -25,7 +25,12 @@ export async function GET(request: NextRequest) {
 
         let query = supabase
             .from('products')
-            .select('*', { count: 'exact' });
+            .select(`
+                *,
+                category:categories(id, name, slug),
+                images:product_images(id, image_url, display_order),
+                sizes:product_sizes(id, size, stock_count)
+            `, { count: 'exact' });
 
         // For non-admins, force active only
         if (!admin) {
