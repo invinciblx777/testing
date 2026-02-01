@@ -1,21 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSupabaseServerClient, requireAdmin } from '@/lib/supabase/server';
+import { requireAdmin, createSupabaseAdmin } from '@/lib/supabase/server';
 
 // GET /api/admin/reviews - List all reviews (admin only)
 export async function GET(request: NextRequest) {
     try {
         await requireAdmin();
-        const supabase = await createSupabaseServerClient();
+        const supabase = createSupabaseAdmin();
         const { searchParams } = new URL(request.url);
 
         const productId = searchParams.get('product_id');
 
         let query = supabase
             .from('reviews')
-            .select(`
-        *,
-        product:products(id, name, slug)
-      `)
+            .select('*')
             .order('created_at', { ascending: false });
 
         if (productId) {
@@ -29,7 +26,7 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: error.message }, { status: 500 });
         }
 
-        return NextResponse.json({ reviews });
+        return NextResponse.json({ reviews: reviews || [] });
     } catch (error) {
         if (error instanceof Error && error.message === 'Forbidden: Admin access required') {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
@@ -39,26 +36,22 @@ export async function GET(request: NextRequest) {
     }
 }
 
-// POST /api/admin/reviews - Create review (admin only)
+// POST /api/admin/reviews - Create review with image upload (admin only)
 export async function POST(request: NextRequest) {
     try {
         await requireAdmin();
-        const supabase = await createSupabaseServerClient();
-        const body = await request.json();
+        const supabase = createSupabaseAdmin();
 
-        const {
-            product_id,
-            reviewer_name,
-            reviewer_image,
-            rating,
-            review_text,
-            is_verified_buyer = true,
-            is_active = true
-        } = body;
+        // Handle FormData (with file upload)
+        const formData = await request.formData();
+        const file = formData.get('file') as File | null;
+        const reviewer_name = formData.get('reviewer_name') as string;
+        const comment = formData.get('comment') as string;
+        const rating = parseInt(formData.get('rating') as string, 10);
 
-        if (!product_id || !reviewer_name || !rating) {
+        if (!reviewer_name || !rating) {
             return NextResponse.json(
-                { error: 'Missing required fields: product_id, reviewer_name, rating' },
+                { error: 'Missing required fields: reviewer_name, rating' },
                 { status: 400 }
             );
         }
@@ -67,16 +60,46 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Rating must be between 1 and 5' }, { status: 400 });
         }
 
+        let reviewer_image: string | null = null;
+
+        // Upload image if provided
+        if (file && file.size > 0) {
+            const fileExt = file.name.split('.').pop() || 'jpg';
+            const fileName = `review_${Date.now()}.${fileExt}`;
+            const filePath = `reviews/${fileName}`;
+
+            const arrayBuffer = await file.arrayBuffer();
+            const buffer = new Uint8Array(arrayBuffer);
+
+            const { error: uploadError } = await supabase.storage
+                .from('reviews')
+                .upload(filePath, buffer, {
+                    contentType: file.type,
+                    upsert: true
+                });
+
+            if (uploadError) {
+                console.error('Upload error:', uploadError);
+                return NextResponse.json({ error: `Upload failed: ${uploadError.message}` }, { status: 500 });
+            }
+
+            // Get public URL
+            const { data: urlData } = supabase.storage
+                .from('reviews')
+                .getPublicUrl(filePath);
+
+            reviewer_image = urlData.publicUrl;
+        }
+
+        // Insert review (without product_id since these are general testimonials)
         const { data: review, error } = await supabase
             .from('reviews')
             .insert({
-                product_id,
                 reviewer_name,
                 reviewer_image,
                 rating,
-                review_text,
-                is_verified_buyer,
-                is_active
+                comment,
+                verified: true
             })
             .select()
             .single();
