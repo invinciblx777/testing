@@ -96,13 +96,13 @@ export function HeroBannerCarousel() {
                 }
             }}
         >
-            <AnimatePresence mode="wait" initial={false}>
+            <AnimatePresence initial={false}>
                 <motion.div
                     key={currentIndex}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    transition={{ duration: 0.5, ease: "easeInOut" }}
+                    transition={{ duration: 0.3, ease: "easeInOut" }}
                     className="absolute inset-0"
                 >
                     <Link href={activeBanners[currentIndex]?.link_url || "/"} className="block w-full h-full">

@@ -2,65 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Loader2, ArrowLeft } from "lucide-react";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 
 export default function LoginPage() {
-    const router = useRouter();
     const supabase = getSupabaseClient();
-
     const [isLoading, setIsLoading] = useState(false);
-    const [showPassword, setShowPassword] = useState(false);
-
-    // Form State
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
-
-    const handleLogin = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setIsLoading(true);
-
-        try {
-            const { error } = await supabase.auth.signInWithPassword({
-                email,
-                password,
-            });
-
-            if (error) {
-                toast.error(error.message);
-                return;
-            }
-
-            // Fetch profile and update store
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-                const { data: profile } = await supabase
-                    .from('profiles')
-                    .select('*')
-                    .eq('id', user.id)
-                    .single();
-
-                const { useStore } = await import("@/lib/store");
-                useStore.getState().login({
-                    id: user.id,
-                    email: user.email!,
-                    full_name: profile?.full_name,
-                    role: profile?.role || 'customer'
-                });
-            }
-
-            toast.success("Welcome back!");
-            router.refresh();
-            router.push("/");
-        } catch (error) {
-            toast.error("Something went wrong");
-        } finally {
-            setIsLoading(false);
-        }
-    };
 
     const handleGoogleLogin = async () => {
         setIsLoading(true);
@@ -90,6 +38,15 @@ export default function LoginPage() {
             <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-pink-200/30 rounded-full blur-[120px] animate-pulse delay-700" />
             <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-rose-200/20 rounded-full blur-[120px] animate-pulse" />
 
+            {/* Back to Store Button */}
+            <Link
+                href="/"
+                className="absolute top-6 left-6 z-20 flex items-center gap-2 text-stone-600 hover:text-primary transition-colors duration-300 group"
+            >
+                <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                <span className="text-sm font-medium">Back to Store</span>
+            </Link>
+
             <div className="relative z-10 w-full max-w-[420px] mx-4 p-8 md:p-12 rounded-3xl border border-white/40 shadow-[0_8px_32px_0_rgba(131,24,67,0.05)] backdrop-blur-xl bg-white/40 flex flex-col items-center animate-in fade-in zoom-in-95 duration-1000">
 
                 <div className="mb-8 flex flex-col items-center">
@@ -102,7 +59,7 @@ export default function LoginPage() {
 
                 <div className="text-center space-y-2 mb-8">
                     <h1 className="font-serif text-2xl md:text-3xl text-primary font-medium tracking-wide">
-                        Welcome Back
+                        Welcome
                     </h1>
                     <p className="text-sm text-muted-foreground font-light tracking-wide">
                         Sign in to access your wishlist & orders
@@ -112,7 +69,7 @@ export default function LoginPage() {
                 <button
                     onClick={handleGoogleLogin}
                     disabled={isLoading}
-                    className="w-full flex items-center justify-center gap-3 bg-white/70 hover:bg-white/90 border border-white/60 text-stone-700 font-medium py-3 rounded-full transition-all duration-300 shadow-sm hover:shadow-md group"
+                    className="w-full flex items-center justify-center gap-3 bg-white/70 hover:bg-white/90 border border-white/60 text-stone-700 font-medium py-4 rounded-full transition-all duration-300 shadow-sm hover:shadow-md group"
                 >
                     {isLoading ? (
                         <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
@@ -141,63 +98,13 @@ export default function LoginPage() {
                     )}
                 </button>
 
-                <div className="w-full flex items-center gap-4 my-6 opacity-60">
-                    <div className="h-[1px] flex-1 bg-stone-300"></div>
-                    <span className="text-xs text-stone-400 font-light uppercase tracking-widest">or email</span>
-                    <div className="h-[1px] flex-1 bg-stone-300"></div>
-                </div>
-
-                <form onSubmit={handleLogin} className="w-full space-y-4">
-                    <div className="space-y-1">
-                        <input
-                            type="email"
-                            required
-                            placeholder="name@example.com"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            className="w-full bg-white/50 border border-stone-200 focus:border-primary/50 focus:bg-white/80 rounded-xl px-4 py-3 outline-none text-stone-800 placeholder:text-stone-400 transition-all duration-300 text-sm"
-                        />
-                    </div>
-
-                    <div className="relative space-y-1">
-                        <input
-                            type={showPassword ? "text" : "password"}
-                            required
-                            placeholder="Password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            className="w-full bg-white/50 border border-stone-200 focus:border-primary/50 focus:bg-white/80 rounded-xl px-4 py-3 outline-none text-stone-800 placeholder:text-stone-400 transition-all duration-300 text-sm pr-10"
-                        />
-                        <button
-                            type="button"
-                            onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-3 top-3 text-stone-400 hover:text-stone-600 transition-colors"
-                        >
-                            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                        </button>
-                    </div>
-
-                    <Button
-                        type="submit"
-                        disabled={isLoading}
-                        className="w-full bg-primary hover:bg-primary/90 text-white rounded-full py-6 text-base font-medium transition-transform active:scale-[0.98] shadow-lg shadow-primary/20 mt-2"
-                    >
-                        {isLoading ? <Loader2 className="animate-spin" /> : "Sign In"}
-                    </Button>
-                </form>
-
-                <div className="mt-8 text-center">
-                    <Link
-                        href="/signup"
-                        className="text-sm text-stone-500 hover:text-primary transition-colors duration-300 font-light"
-                    >
-                        New to Kurtis Boutique? <span className="font-medium underline underline-offset-4 decoration-primary/30">Create an account</span>
-                    </Link>
-                </div>
+                <p className="mt-8 text-center text-sm text-stone-500 font-light">
+                    By signing in, you agree to our Terms of Service and Privacy Policy
+                </p>
 
                 <div className="mt-8 flex gap-6 text-xs text-stone-400 font-light">
-                    <Link href="#" className="hover:text-stone-600 transition-colors">Privacy Policy</Link>
-                    <Link href="#" className="hover:text-stone-600 transition-colors">Terms of Service</Link>
+                    <Link href="/privacy-policy" className="hover:text-stone-600 transition-colors">Privacy Policy</Link>
+                    <Link href="/exchange-and-shipping" className="hover:text-stone-600 transition-colors">Terms of Service</Link>
                 </div>
 
             </div>

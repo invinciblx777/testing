@@ -19,6 +19,11 @@ export interface Category {
     name: string;
     slug: string;
     image_url?: string;
+    products?: Array<{
+        id: string;
+        name: string;
+        product_images: Array<{ image_url: string }>;
+    }>;
 }
 
 export interface CartItem {

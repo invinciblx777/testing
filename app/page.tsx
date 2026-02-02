@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { CategoryBubbles } from "@/components/home/CategoryBubbles";
+import { CategoryGridItem } from "@/components/home/CategoryGridItem";
 import { HeroBannerCarousel } from "@/components/ui/HeroBannerCarousel";
 import { CircularTestimonialsWrapper } from "@/components/ui/circular-testimonials-wrapper";
 import { NewArrivalsSection } from "@/components/NewArrivalsSection";
@@ -62,25 +63,7 @@ export default function Home() {
               [1, 2, 3, 4, 5].map(i => <Skeleton key={i} className="aspect-[4/5] rounded-lg" />)
             ) : (
               categories.map((cat) => (
-                <Link key={cat.id} href={`/shop?category=${cat.id}`} className="group relative aspect-[4/5] overflow-hidden rounded-lg bg-secondary/50">
-                  <div className="absolute inset-0 transition-transform duration-700 group-hover:scale-105 bg-stone-300">
-                    {cat.image_url ? (
-                      <img
-                        src={cat.image_url}
-                        alt={cat.name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full bg-stone-200 flex items-center justify-center text-stone-400">
-                        <span className="text-xs">No Image</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-60 group-hover:opacity-70 transition-opacity" />
-                  <div className="absolute bottom-4 left-4 text-white">
-                    <h3 className="font-medium text-lg leading-tight">{cat.name}</h3>
-                  </div>
-                </Link>
+                <CategoryGridItem key={cat.id} category={cat} />
               ))
             )}
           </div>

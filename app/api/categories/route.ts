@@ -1,15 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseServerClient, requireAdmin } from '@/lib/supabase/server';
 
-// GET /api/categories - List all categories (public)
+// GET /api/categories - List all categories with product images (public)
 export async function GET() {
     try {
         const supabase = await createSupabaseServerClient();
 
         const { data: categories, error } = await supabase
             .from('categories')
-            .select('*')
+            .select(`
+                *,
+                products:products(
+                    id,
+                    name,
+                    product_images(image_url)
+                )
+            `)
             .eq('is_active', true)
+            .eq('products.is_active', true)
             .order('display_order');
 
         if (error) {

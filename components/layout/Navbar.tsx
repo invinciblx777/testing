@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Search, Heart, ShoppingBag, Menu, X, User as UserIcon } from "lucide-react";
-import { useState, useEffect } from "react";
+import { Search, Heart, ShoppingBag, Menu, X, User as UserIcon, LogOut, ChevronDown } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/lib/store";
@@ -20,11 +20,24 @@ export function Navbar() {
     const [isOpen, setIsOpen] = useState(false);
     const [isCartOpen, setIsCartOpen] = useState(false);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
+    const [isAccountOpen, setIsAccountOpen] = useState(false);
     const { cart, user, logout } = useStore();
     const [mounted, setMounted] = useState(false);
+    const accountRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         setMounted(true);
+    }, []);
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (accountRef.current && !accountRef.current.contains(event.target as Node)) {
+                setIsAccountOpen(false);
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
     // Lock body scroll when mobile menu is open
@@ -40,6 +53,11 @@ export function Navbar() {
     }, [isOpen]);
 
     const cartCount = cart.reduce((total, item) => total + item.quantity, 0);
+
+    const handleLogout = () => {
+        logout();
+        setIsAccountOpen(false);
+    };
 
     return (
         <>
@@ -87,13 +105,50 @@ export function Navbar() {
                                 <Search className="h-5 w-5" />
                             </Button>
 
-                            {/* User: Desktop Only (Mobile is on Left) */}
+                            {/* User: Desktop Only with Dropdown */}
                             {mounted && user ? (
-                                <div className="hidden md:flex items-center gap-2">
-                                    <span className="text-sm font-medium hidden lg:inline-block">Hi, {user.full_name || user.email}</span>
-                                    <Button variant="ghost" size="icon" onClick={() => logout()}>
+                                <div className="hidden md:block relative" ref={accountRef}>
+                                    <button
+                                        onClick={() => setIsAccountOpen(!isAccountOpen)}
+                                        className="flex items-center gap-2 px-3 py-2 rounded-full hover:bg-secondary/50 transition-colors"
+                                    >
                                         <UserIcon className="h-5 w-5" />
-                                    </Button>
+                                        <span className="text-sm font-medium hidden lg:inline-block max-w-[120px] truncate">
+                                            {user.full_name || user.email}
+                                        </span>
+                                        <ChevronDown className={cn("h-4 w-4 transition-transform", isAccountOpen && "rotate-180")} />
+                                    </button>
+
+                                    {/* Dropdown Menu */}
+                                    {isAccountOpen && (
+                                        <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-border/50 py-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                                            <div className="px-4 py-2 border-b border-border/40">
+                                                <p className="text-sm font-medium text-foreground truncate">{user.full_name || 'Account'}</p>
+                                                <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                                            </div>
+                                            <Link
+                                                href="/orders"
+                                                onClick={() => setIsAccountOpen(false)}
+                                                className="flex items-center gap-3 px-4 py-2 text-sm text-foreground hover:bg-secondary/50 transition-colors"
+                                            >
+                                                My Orders
+                                            </Link>
+                                            <Link
+                                                href="/wishlist"
+                                                onClick={() => setIsAccountOpen(false)}
+                                                className="flex items-center gap-3 px-4 py-2 text-sm text-foreground hover:bg-secondary/50 transition-colors"
+                                            >
+                                                Wishlist
+                                            </Link>
+                                            <button
+                                                onClick={handleLogout}
+                                                className="flex items-center gap-3 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                                            >
+                                                <LogOut className="h-4 w-4" />
+                                                Logout
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             ) : (
                                 <Link href="/login" className="hidden md:block">
@@ -102,8 +157,6 @@ export function Navbar() {
                                     </Button>
                                 </Link>
                             )}
-
-
 
                             <Link href="/wishlist" className="hidden md:flex">
                                 <Button variant="ghost" size="icon">
@@ -176,7 +229,7 @@ export function Navbar() {
                                     }}
                                     className="text-lg font-medium text-muted-foreground hover:text-red-500 flex items-center gap-2"
                                 >
-                                    <UserIcon className="w-5 h-5" /> Logout
+                                    <LogOut className="w-5 h-5" /> Logout
                                 </button>
                             )}
                         </div>
