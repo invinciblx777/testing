@@ -10,13 +10,21 @@ export async function GET() {
         const { data: cartItems, error } = await supabase
             .from('cart_items')
             .select(`
-        *,
-        product:products(
-          *,
-          images:product_images(*),
-          sizes:product_sizes(*)
-        )
-      `)
+                id,
+                user_id,
+                product_id,
+                size,
+                quantity,
+                created_at,
+                product:products(
+                    id,
+                    name,
+                    slug,
+                    price,
+                    discount_price,
+                    images:product_images(image_url)
+                )
+            `)
             .eq('user_id', user.id)
             .order('created_at');
 
