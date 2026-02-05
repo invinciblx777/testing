@@ -109,15 +109,13 @@ export default function OrdersPage() {
                                         </div>
 
                                         <div className="flex flex-col sm:flex-row gap-3">
-                                            <a
-                                                href={`https://shiprocket.co/tracking/${order.awbId || order.id}`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
+                                            <Link
+                                                href={`/account/orders/${order.id}`}
                                             >
                                                 <Button className="w-full sm:w-auto gap-2 bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 rounded-xl">
-                                                    Track Order <ChevronRight className="w-4 h-4" />
+                                                    View Order <ChevronRight className="w-4 h-4" />
                                                 </Button>
-                                            </a>
+                                            </Link>
                                         </div>
                                     </div>
                                 </motion.div>

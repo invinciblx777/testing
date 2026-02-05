@@ -1,33 +1,33 @@
+/**
+ * Order tracking utilities
+ */
 
 export function getTrackingUrl(awb: string | null, courier: string | null): string {
     if (!awb || !courier) return '#';
 
-    // Placeholder Logic for Shiprocket / Courier Links
-    // In a real app, this would map courier codes to their specific tracking URL patterns.
-
-    // Example patterns (mock):
-    // Delhivery: https://www.delhivery.com/track/package/{awb}
-    // Bluedart: https://www.bluedart.com/track?handler=trakdocs&trackId={awb}
-
-    // For now, we return a generic placeholder that the User requested.
-    // Ideally, this could link to a Shiprocket tracking page if we had the specific URL format.
-
-    const courierSlug = courier.toLowerCase().replace(/\s+/g, '-');
-    return `https://kurtisboutique.shiprocket.co/tracking/${awb}`;
+    // Generic tracking URL placeholder
+    // Can be updated when a shipping provider is integrated
+    return `/orders`;
 }
 
 export function getStatusDescription(status: string): string {
     switch (status) {
-        case 'Pending Shipment':
+        case 'pending':
+            return 'Your order has been placed and is awaiting confirmation.';
+        case 'confirmed':
+            return 'Your order has been confirmed.';
+        case 'processing':
             return 'We are preparing your order for shipment.';
-        case 'Shipped':
+        case 'shipped':
             return 'Your order has been shipped and is on its way.';
-        case 'In Transit':
+        case 'in_transit':
             return 'Your order is in transit and will reach you soon.';
-        case 'Delivered':
+        case 'delivered':
             return 'Your order has been delivered.';
-        case 'RTO':
-            return 'Order was returned to origin.';
+        case 'cancelled':
+            return 'Your order has been cancelled.';
+        case 'refunded':
+            return 'Your order has been refunded.';
         default:
             return 'Status update available soon.';
     }
