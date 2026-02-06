@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
+import { LoginForm } from "@/components/auth/LoginForm";
 
 export default function LoginPage() {
     const supabase = getSupabaseClient();
@@ -97,6 +98,19 @@ export default function LoginPage() {
                         </>
                     )}
                 </button>
+
+                <div className="relative w-full my-8">
+                    <div className="absolute inset-0 flex items-center">
+                        <div className="w-full border-t border-stone-200/60" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase tracking-wider">
+                        <span className="bg-white/40 px-3 text-stone-400 font-medium backdrop-blur-sm rounded-full">
+                            Or continue with email
+                        </span>
+                    </div>
+                </div>
+
+                <LoginForm />
 
                 <p className="mt-8 text-center text-sm text-stone-500 font-light">
                     By signing in, you agree to our Terms of Service and Privacy Policy
