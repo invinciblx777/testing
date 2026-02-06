@@ -4,11 +4,13 @@ import { GoogleButton } from '@/components/auth/GoogleButton';
 
 export const dynamic = 'force-dynamic';
 
-export default function LoginPage({
+export default async function LoginPage({
     searchParams,
 }: {
-    searchParams: { redirect?: string; error?: string };
+    searchParams: Promise<{ redirect?: string; error?: string }>;
 }) {
+    const params = await searchParams;
+
     return (
         <div className="animate-fade-in">
             <div className="lg:hidden text-center mb-8">
@@ -23,9 +25,9 @@ export default function LoginPage({
                 Sign in to your account to continue
             </p>
 
-            {searchParams.error && (
+            {params.error && (
                 <div className="mt-4 rounded-lg bg-red-50 dark:bg-red-900/20 p-4 text-sm text-red-600 dark:text-red-400">
-                    {searchParams.error === 'auth_callback_error'
+                    {params.error === 'auth_callback_error'
                         ? 'There was an error signing in. Please try again.'
                         : 'An error occurred. Please try again.'}
                 </div>
@@ -45,7 +47,7 @@ export default function LoginPage({
                     </div>
                 </div>
 
-                <LoginForm redirectTo={searchParams.redirect} />
+                <LoginForm redirectTo={params.redirect} />
             </div>
 
             <p className="mt-8 text-center text-sm text-gray-600 dark:text-gray-400">

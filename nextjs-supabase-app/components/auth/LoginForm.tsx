@@ -32,6 +32,9 @@ export function LoginForm({ redirectTo }: { redirectTo?: string }) {
             // Force hard navigation to prevent UI freezing on slow dashboard load
             // This replaces router.push(redirectTo || '/dashboard');
             window.location.href = redirectTo || '/dashboard';
+
+            // Safety fallback: if navigation stalls, reset loading after 5 seconds
+            setTimeout(() => setLoading(false), 5000);
         } catch (err: any) {
             console.error('Login error:', err);
             setError(err.message || 'An unexpected error occurred');
