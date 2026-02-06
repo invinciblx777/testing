@@ -18,21 +18,34 @@ export function LoginForm({ redirectTo }: { redirectTo?: string }) {
         setLoading(true);
 
         try {
-            const { error } = await supabase.auth.signInWithPassword({
-                email,
-                password,
+            // Create a timeout promise that rejects after 15 seconds
+            const timeoutPromise = new Promise<{ error: { message: string } | null }>((_, reject) => {
+                setTimeout(() => reject(new Error('Request timed out. Please check your internet connection.')), 15000);
             });
+
+            // Race the auth request against the timeout
+            const { error } = await Promise.race([
+                supabase.auth.signInWithPassword({
+                    email,
+                    password,
+                }),
+                timeoutPromise as Promise<{ error: { message: string } | null; data?: any }>,
+            ]);
 
             if (error) {
                 setError(error.message);
+                setLoading(false); // Make sure to stop loading on error
                 return;
             }
 
             router.push(redirectTo || '/dashboard');
             router.refresh();
-        } catch {
-            setError('An unexpected error occurred');
-        } finally {
+        } catch (err) {
+            if (err instanceof Error) {
+                setError(err.message);
+            } else {
+                setError('An unexpected error occurred');
+            }
             setLoading(false);
         }
     };

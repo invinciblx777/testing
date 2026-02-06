@@ -10,12 +10,21 @@ export function GoogleButton() {
     const handleGoogleSignIn = async () => {
         setLoading(true);
 
-        await supabase.auth.signInWithOAuth({
-            provider: 'google',
-            options: {
-                redirectTo: `${window.location.origin}/auth/callback`,
-            },
-        });
+        try {
+            const { error } = await supabase.auth.signInWithOAuth({
+                provider: 'google',
+                options: {
+                    redirectTo: `${window.location.origin}/auth/callback`,
+                },
+            });
+            if (error) {
+                console.error('Google Sign In Error:', error);
+                setLoading(false);
+            }
+        } catch (error) {
+            console.error('Unexpected error during Google Sign In:', error);
+            setLoading(false);
+        }
     };
 
     return (
