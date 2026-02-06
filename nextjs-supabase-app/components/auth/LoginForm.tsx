@@ -29,13 +29,12 @@ export function LoginForm({ redirectTo }: { redirectTo?: string }) {
 
             console.log('Login successful:', data);
 
-            // Only redirect if successful
-            router.push(redirectTo || '/dashboard');
-            router.refresh();
+            // Force hard navigation to prevent UI freezing on slow dashboard load
+            // This replaces router.push(redirectTo || '/dashboard');
+            window.location.href = redirectTo || '/dashboard';
         } catch (err: any) {
             console.error('Login error:', err);
             setError(err.message || 'An unexpected error occurred');
-        } finally {
             setLoading(false);
         }
     };
