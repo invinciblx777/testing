@@ -59,7 +59,9 @@ export function ProductPageClient({ product }: ProductPageClientProps) {
             toast.error("Please select a size");
             return;
         }
+
         const success = await addToCart(product.id, selectedSize, quantity);
+
         if (success) {
             toast.success("Added to Cart");
         } else {

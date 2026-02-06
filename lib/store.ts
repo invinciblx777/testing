@@ -1,23 +1,10 @@
 import { create } from 'zustand';
 import { User, Order } from '@/types';
+import { CartService, CartItem } from './cartService';
+
 
 // Extended cart item with product details from DB
-export interface DBCartItem {
-    id: string;
-    user_id: string;
-    product_id: string;
-    size: string;
-    quantity: number;
-    created_at: string;
-    product?: {
-        id: string;
-        name: string;
-        slug: string;
-        price: number;
-        discount_price?: number;
-        images?: { image_url: string }[];
-    };
-}
+export type DBCartItem = CartItem;
 
 // Wishlist item from DB
 export interface DBWishlistItem {
@@ -151,6 +138,8 @@ export const useStore = create<StoreState>()((set, get) => ({
                     wishlist: data.product_ids || [],
                     wishlistLoading: false
                 });
+            } else {
+                set({ wishlistLoading: false });
             }
         } catch (error) {
             console.error('Failed to sync wishlist:', error);
@@ -220,14 +209,9 @@ export const useStore = create<StoreState>()((set, get) => ({
     syncCart: async () => {
         set({ cartLoading: true });
         try {
-            const res = await fetch('/api/cart');
-            if (res.ok) {
-                const data = await res.json();
-                set({ cart: data.cart || [], cartLoading: false });
-            } else if (res.status === 401) {
-                // User not authenticated, clear cart
-                set({ cart: [], cartLoading: false });
-            }
+            const items = await CartService.getCart();
+            // Cast strictly to ensure type compatibility if needed, though CartItem matches
+            set({ cart: items as DBCartItem[], cartLoading: false });
         } catch (error) {
             console.error('Failed to sync cart:', error);
             set({ cartLoading: false });
@@ -235,22 +219,10 @@ export const useStore = create<StoreState>()((set, get) => ({
     },
 
     addToCart: async (productId, size, quantity = 1) => {
+        if (!get().isAuthenticated) return false;
+
         try {
-            const res = await fetch('/api/cart', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ product_id: productId, size, quantity })
-            });
-
-            if (!res.ok) {
-                if (res.status === 401) {
-                    console.error('User must be logged in to add to cart');
-                    return false;
-                }
-                return false;
-            }
-
-            // Refetch cart to get updated state
+            await CartService.addToCart(productId, size, quantity);
             await get().syncCart();
             return true;
         } catch (error) {
@@ -260,77 +232,54 @@ export const useStore = create<StoreState>()((set, get) => ({
     },
 
     removeFromCart: async (cartItemId) => {
-        // Optimistic update
         const currentCart = get().cart;
-        set({ cart: currentCart.filter(item => item.id !== cartItemId) });
+        set({ cart: currentCart.filter(item => item.id !== cartItemId) }); // Optimistic
 
         try {
-            const res = await fetch(`/api/cart?id=${cartItemId}`, {
-                method: 'DELETE'
-            });
-
-            if (!res.ok) {
-                set({ cart: currentCart });
-                return false;
-            }
+            await CartService.removeFromCart(cartItemId);
+            // No need to sync if successful as we updated optimistically, but syncing ensures consistency
             return true;
         } catch (error) {
             console.error('Failed to remove from cart:', error);
-            set({ cart: currentCart });
+            set({ cart: currentCart }); // Revert
             return false;
         }
     },
 
     updateCartQuantity: async (cartItemId, quantity) => {
-        // Optimistic update
         const currentCart = get().cart;
-        set({
-            cart: currentCart.map(item =>
-                item.id === cartItemId ? { ...item, quantity } : item
-            )
-        });
+
+        // Optimistic
+        if (quantity <= 0) {
+            set({ cart: currentCart.filter(item => item.id !== cartItemId) });
+        } else {
+            set({
+                cart: currentCart.map(item =>
+                    item.id === cartItemId ? { ...item, quantity } : item
+                )
+            });
+        }
 
         try {
-            const res = await fetch('/api/cart', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ cart_item_id: cartItemId, quantity })
-            });
-
-            if (!res.ok) {
-                set({ cart: currentCart });
-                return false;
-            }
-
-            // Refetch if item was deleted (quantity <= 0)
-            if (quantity <= 0) {
-                await get().syncCart();
-            }
+            await CartService.updateQuantity(cartItemId, quantity);
             return true;
         } catch (error) {
             console.error('Failed to update cart quantity:', error);
-            set({ cart: currentCart });
+            set({ cart: currentCart }); // Revert
             return false;
         }
     },
 
     clearCart: async () => {
         const currentCart = get().cart;
-        set({ cart: [] });
+        set({ cart: [] }); // Optimistic
 
         try {
-            const res = await fetch('/api/cart?clear=true', {
-                method: 'DELETE'
-            });
-
-            if (!res.ok) {
-                set({ cart: currentCart });
-                return false;
-            }
+            await CartService.clearCart();
             return true;
         } catch (error) {
             console.error('Failed to clear cart:', error);
-            set({ cart: currentCart });
+            set({ cart: currentCart }); // Revert
             return false;
         }
     },
@@ -383,3 +332,4 @@ export const useStore = create<StoreState>()((set, get) => ({
         )
     })),
 }));
+
