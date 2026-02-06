@@ -8,9 +8,8 @@ export function GoogleButton() {
     const supabase = createClient();
 
     const handleGoogleSignIn = async () => {
-        setLoading(true);
-
         try {
+            setLoading(true);
             const redirectUrl = `${window.location.origin}/auth/callback`;
             console.log('Initiating Google Sign-In with redirect:', redirectUrl);
 
@@ -21,14 +20,13 @@ export function GoogleButton() {
                 },
             });
 
-            console.log('Google Sign-In initiation response:', data);
+            if (error) throw error;
 
-            if (error) {
-                console.error('Google Sign In Error:', error);
-                setLoading(false);
-            }
-        } catch (error) {
-            console.error('Unexpected error during Google Sign In:', error);
+            console.log('Google Sign-In initiated:', data);
+        } catch (error: any) {
+            console.error('Google Sign In Error:', error);
+            // Optional: You could expose an onError prop to show a toast/alert
+        } finally {
             setLoading(false);
         }
     };

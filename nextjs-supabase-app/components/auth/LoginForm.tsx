@@ -25,26 +25,18 @@ export function LoginForm({ redirectTo }: { redirectTo?: string }) {
                 password,
             });
 
-            console.log('Login response:', data);
+            if (error) throw error;
 
-            if (error) {
-                console.error('Login error:', error);
-                setError(error.message);
-                setLoading(false); // STOP LOADING ON ERROR
-                return;
-            }
+            console.log('Login successful:', data);
 
-            console.log('Login successful, redirecting...');
+            // Only redirect if successful
             router.push(redirectTo || '/dashboard');
             router.refresh();
-        } catch (err) {
-            console.error('Unexpected error during login:', err);
-            if (err instanceof Error) {
-                setError(err.message);
-            } else {
-                setError('An unexpected error occurred');
-            }
-            setLoading(false); // ALWAYS STOP LOADING ON ERROR
+        } catch (err: any) {
+            console.error('Login error:', err);
+            setError(err.message || 'An unexpected error occurred');
+        } finally {
+            setLoading(false);
         }
     };
 
