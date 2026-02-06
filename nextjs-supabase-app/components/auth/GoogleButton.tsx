@@ -11,12 +11,18 @@ export function GoogleButton() {
         setLoading(true);
 
         try {
-            const { error } = await supabase.auth.signInWithOAuth({
+            const redirectUrl = `${window.location.origin}/auth/callback`;
+            console.log('Initiating Google Sign-In with redirect:', redirectUrl);
+
+            const { data, error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
-                    redirectTo: `${window.location.origin}/auth/callback`,
+                    redirectTo: redirectUrl,
                 },
             });
+
+            console.log('Google Sign-In initiation response:', data);
+
             if (error) {
                 console.error('Google Sign In Error:', error);
                 setLoading(false);

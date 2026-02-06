@@ -18,35 +18,33 @@ export function LoginForm({ redirectTo }: { redirectTo?: string }) {
         setLoading(true);
 
         try {
-            // Create a timeout promise that rejects after 15 seconds
-            const timeoutPromise = new Promise<{ error: { message: string } | null }>((_, reject) => {
-                setTimeout(() => reject(new Error('Request timed out. Please check your internet connection.')), 15000);
+            console.log('Attempting login with:', email);
+
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email,
+                password,
             });
 
-            // Race the auth request against the timeout
-            const { error } = await Promise.race([
-                supabase.auth.signInWithPassword({
-                    email,
-                    password,
-                }),
-                timeoutPromise as Promise<{ error: { message: string } | null; data?: any }>,
-            ]);
+            console.log('Login response:', data);
 
             if (error) {
+                console.error('Login error:', error);
                 setError(error.message);
-                setLoading(false); // Make sure to stop loading on error
+                setLoading(false); // STOP LOADING ON ERROR
                 return;
             }
 
+            console.log('Login successful, redirecting...');
             router.push(redirectTo || '/dashboard');
             router.refresh();
         } catch (err) {
+            console.error('Unexpected error during login:', err);
             if (err instanceof Error) {
                 setError(err.message);
             } else {
                 setError('An unexpected error occurred');
             }
-            setLoading(false);
+            setLoading(false); // ALWAYS STOP LOADING ON ERROR
         }
     };
 
