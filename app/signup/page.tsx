@@ -6,13 +6,11 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
-import { getSupabaseClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
 export default function SignupPage() {
     const router = useRouter();
-    const supabase = getSupabaseClient();
 
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
@@ -24,30 +22,32 @@ export default function SignupPage() {
         setIsLoading(true);
 
         try {
-            const { error } = await supabase.auth.signUp({
-                email,
-                password,
-                options: {
-                    data: {
-                        full_name: name,
-                    },
+            // Use server-side API to create user with auto-confirmation
+            const response = await fetch('/api/auth/signup', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
                 },
+                body: JSON.stringify({ email, password, name }),
             });
 
-            if (error) {
-                toast.error(error.message);
+            const data = await response.json();
+
+            if (!response.ok) {
+                toast.error(data.error || 'Signup failed');
                 return;
             }
 
-            toast.success("Account created! Please check your email/login.");
+            toast.success("Account created! You can now login.");
             router.refresh();
-            router.push("/login?signup=success"); // Redirect to login or home
+            router.push("/login?signup=success");
         } catch (error) {
             toast.error("An unexpected error occurred");
         } finally {
             setIsLoading(false);
         }
     };
+
 
     return (
         <div className="min-h-screen bg-background/60 backdrop-blur-sm flex flex-col">

@@ -159,6 +159,7 @@ CREATE TABLE IF NOT EXISTS public.banners (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+
 -- Customisation Queries
 CREATE TABLE IF NOT EXISTS public.customisation_queries (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -617,12 +618,35 @@ CREATE POLICY "Admin can delete category images" ON storage.objects
   FOR DELETE USING (bucket_id = 'category-images' AND public.is_admin());
 
 -- ============================================
--- 8. ENABLE REALTIME
+-- 8. ENABLE REALTIME (Safe - ignores if already added)
 -- ============================================
-ALTER PUBLICATION supabase_realtime ADD TABLE public.products;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.orders;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.cart_items;
+DO $$
+BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.products;
+EXCEPTION WHEN duplicate_object THEN
+    -- Table already in publication, ignore
+END $$;
+
+DO $$
+BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.orders;
+EXCEPTION WHEN duplicate_object THEN
+    -- Table already in publication, ignore
+END $$;
+
+DO $$
+BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
+EXCEPTION WHEN duplicate_object THEN
+    -- Table already in publication, ignore
+END $$;
+
+DO $$
+BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.cart_items;
+EXCEPTION WHEN duplicate_object THEN
+    -- Table already in publication, ignore
+END $$;
 
 -- ============================================
 -- SETUP COMPLETE!

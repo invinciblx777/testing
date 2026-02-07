@@ -6,13 +6,20 @@ export async function GET(request: NextRequest) {
     try {
         let supabase = await createSupabaseServerClient();
         const { searchParams } = new URL(request.url);
-        const admin = await isAdmin();
+        let admin = false;
 
-        // Use Admin Client if admin to bypass RLS completely
-        if (admin) {
-            console.log("Admin requesting products: Switching to Service Role Client");
-            const { createSupabaseAdmin } = await import('@/lib/supabase/server');
-            supabase = createSupabaseAdmin();
+        // Check admin status - gracefully handle if service role key is missing
+        try {
+            admin = await isAdmin();
+            // Only use admin client if service role key is available
+            if (admin && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+                console.log("Admin requesting products: Switching to Service Role Client");
+                const { createSupabaseAdmin } = await import('@/lib/supabase/server');
+                supabase = createSupabaseAdmin();
+            }
+        } catch {
+            // If admin check fails, continue as non-admin
+            admin = false;
         }
 
         // Query parameters

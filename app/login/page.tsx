@@ -112,7 +112,14 @@ export default function LoginPage() {
 
                 <LoginForm />
 
-                <p className="mt-8 text-center text-sm text-stone-500 font-light">
+                <p className="mt-6 text-center text-sm text-stone-600">
+                    Don&apos;t have an account?{" "}
+                    <Link href="/signup" className="text-primary font-medium hover:underline">
+                        Sign up
+                    </Link>
+                </p>
+
+                <p className="mt-6 text-center text-sm text-stone-500 font-light">
                     By signing in, you agree to our Terms of Service and Privacy Policy
                 </p>
 

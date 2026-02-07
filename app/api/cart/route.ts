@@ -22,7 +22,7 @@ export async function GET() {
                     slug,
                     price,
                     discount_price,
-                    images:product_images(id, image_url, is_primary)
+                    images:product_images(id, image_url, display_order)
                 )
             `)
             .eq('user_id', user.id)
