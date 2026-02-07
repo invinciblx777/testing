@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { CheckCircle, Package, ArrowRight, ShoppingBag, Loader2 } from "lucide-react";
@@ -10,7 +10,19 @@ import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { getSupabaseClient } from "@/lib/supabase/client";
 
-export default function OrderSuccessPage() {
+function LoadingState() {
+    return (
+        <div className="min-h-screen flex flex-col">
+            <Navbar />
+            <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-stone-50 via-rose-50/30 to-stone-100">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+            <Footer />
+        </div>
+    );
+}
+
+function OrderSuccessContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const [orderDetails, setOrderDetails] = useState<{
@@ -25,10 +37,8 @@ export default function OrderSuccessPage() {
         const status = searchParams.get('status');
 
         if (orderId) {
-            // Fetch order details from Supabase
             fetchOrderDetails(orderId);
         } else {
-            // Default success state without specific order
             setOrderDetails({
                 orderId: 'N/A',
                 total: 0,
@@ -73,15 +83,7 @@ export default function OrderSuccessPage() {
     };
 
     if (loading) {
-        return (
-            <div className="min-h-screen flex flex-col">
-                <Navbar />
-                <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-stone-50 via-rose-50/30 to-stone-100">
-                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                </div>
-                <Footer />
-            </div>
-        );
+        return <LoadingState />;
     }
 
     return (
@@ -208,5 +210,13 @@ export default function OrderSuccessPage() {
             </div>
             <Footer />
         </div>
+    );
+}
+
+export default function OrderSuccessPage() {
+    return (
+        <Suspense fallback={<LoadingState />}>
+            <OrderSuccessContent />
+        </Suspense>
     );
 }
