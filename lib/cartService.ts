@@ -17,7 +17,22 @@ export interface CartItem {
 export const CartService = {
     async getCart() {
         const supabase = createSupabaseClient();
-        const { data: { user } } = await supabase.auth.getUser();
+
+        let user = null;
+        try {
+            const { data: { user: authUser } } = await supabase.auth.getUser();
+            user = authUser;
+        } catch (error) {
+            // Handle AbortError gracefully - common in React StrictMode
+            const isAbortError = error instanceof Error &&
+                (error.name === 'AbortError' || error.message?.includes('abort'));
+            if (isAbortError) {
+                console.log('[CartService] getUser aborted, returning empty cart');
+                return [];
+            }
+            console.error('[CartService] Error getting user:', error);
+            return [];
+        }
 
         if (!user) return [];
 

@@ -11,22 +11,31 @@ import { formatPrice } from '@/lib/utils';
 import { toast } from 'sonner';
 
 export default function CheckoutPage() {
-    const { cart, isAuthenticated, cartLoading, getCartTotal, syncCart } = useStore();
+    const { cart, isAuthenticated, isLoading, cartLoading, getCartTotal, syncCart } = useStore();
     const router = useRouter();
     const [isInitiating, setIsInitiating] = useState(false);
     const [hydrated, setHydrated] = useState(false);
 
     useEffect(() => {
         setHydrated(true);
-        if (!isAuthenticated && !cartLoading) {
-            // Wait a bit to ensure auth state is settled
-            const timer = setTimeout(() => {
-                if (!useStore.getState().isAuthenticated) router.push('/login?redirect=/checkout');
-            }, 1000);
-            return () => clearTimeout(timer);
+    }, []);
+
+    // Separate effect for auth check - only run when auth loading is done
+    useEffect(() => {
+        // Don't check until auth loading is complete
+        if (isLoading) return;
+
+        // If not authenticated after auth check completes, redirect to login
+        if (!isAuthenticated) {
+            console.log('[Checkout] Not authenticated, redirecting to login');
+            router.push('/login?redirect=/checkout');
+            return;
         }
+
+        // Only sync cart when authenticated
         syncCart();
-    }, [isAuthenticated, cartLoading, router, syncCart]);
+    }, [isLoading, isAuthenticated, router, syncCart]);
+
 
     const handleCheckout = async () => {
         if (cart.length === 0) {
@@ -35,6 +44,8 @@ export default function CheckoutPage() {
         }
 
         setIsInitiating(true);
+        console.log('[Checkout] Starting checkout with', cart.length, 'items');
+
         try {
             const response = await fetch('/api/checkout/initiate', {
                 method: 'POST',
@@ -42,25 +53,39 @@ export default function CheckoutPage() {
             });
 
             const data = await response.json();
+            console.log('[Checkout] API Response:', { status: response.status, data });
 
             if (!response.ok) {
-                throw new Error(data.error || 'Checkout initiation failed');
+                // Log detailed error for debugging
+                console.error('[Checkout] ❌ API Error:', data);
+
+                // Show detailed error if available
+                if (data.details) {
+                    console.error('[Checkout] Shiprocket response:', data.details);
+                    toast.error(`Checkout failed: ${JSON.stringify(data.details).substring(0, 100)}`);
+                } else {
+                    toast.error(data.error || 'Checkout initiation failed');
+                }
+                return;
             }
 
             if (data.checkoutUrl) {
+                console.log('[Checkout] ✅ Redirecting to:', data.checkoutUrl);
                 window.location.href = data.checkoutUrl;
             } else {
-                toast.error("Failed to get checkout URL");
+                console.error('[Checkout] ❌ No checkout URL in response:', data);
+                toast.error("Failed to get checkout URL - please try again");
             }
         } catch (error) {
-            console.error('Checkout error:', error);
+            console.error('[Checkout] ❌ Exception:', error);
             toast.error(error instanceof Error ? error.message : "Something went wrong");
         } finally {
             setIsInitiating(false);
         }
     };
 
-    if (!hydrated || cartLoading) {
+
+    if (!hydrated || isLoading || cartLoading) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-gray-50">
                 <div className="flex flex-col items-center gap-4">

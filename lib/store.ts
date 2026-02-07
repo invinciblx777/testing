@@ -129,22 +129,37 @@ export const useStore = create<StoreState>()((set, get) => ({
 
     syncWishlist: async () => {
         set({ wishlistLoading: true });
-        try {
-            const res = await fetch('/api/wishlist');
-            if (res.ok) {
-                const data = await res.json();
-                set({
-                    wishlistItems: data.wishlist || [],
-                    wishlist: data.product_ids || [],
-                    wishlistLoading: false
-                });
-            } else {
+
+        const attemptSync = async (retryCount = 0): Promise<void> => {
+            try {
+                const res = await fetch('/api/wishlist');
+                if (res.ok) {
+                    const data = await res.json();
+                    set({
+                        wishlistItems: data.wishlist || [],
+                        wishlist: data.product_ids || [],
+                        wishlistLoading: false
+                    });
+                } else {
+                    set({ wishlistLoading: false });
+                }
+            } catch (error) {
+                const isAbortError = error instanceof Error &&
+                    (error.name === 'AbortError' || error.message?.includes('abort'));
+
+                // Retry once on AbortError (common in React StrictMode)
+                if (isAbortError && retryCount < 1) {
+                    console.log('[Wishlist] AbortError, retrying in 500ms...');
+                    await new Promise(r => setTimeout(r, 500));
+                    return attemptSync(retryCount + 1);
+                }
+
+                console.error('Failed to sync wishlist:', error);
                 set({ wishlistLoading: false });
             }
-        } catch (error) {
-            console.error('Failed to sync wishlist:', error);
-            set({ wishlistLoading: false });
-        }
+        };
+
+        await attemptSync();
     },
 
     addToWishlist: async (productId) => {
@@ -208,14 +223,29 @@ export const useStore = create<StoreState>()((set, get) => ({
 
     syncCart: async () => {
         set({ cartLoading: true });
-        try {
-            const items = await CartService.getCart();
-            // Cast strictly to ensure type compatibility if needed, though CartItem matches
-            set({ cart: items as DBCartItem[], cartLoading: false });
-        } catch (error) {
-            console.error('Failed to sync cart:', error);
-            set({ cartLoading: false });
-        }
+
+        const attemptSync = async (retryCount = 0): Promise<void> => {
+            try {
+                const items = await CartService.getCart();
+                set({ cart: items as DBCartItem[], cartLoading: false });
+            } catch (error) {
+                const isAbortError = error instanceof Error &&
+                    (error.name === 'AbortError' || error.message?.includes('abort'));
+
+                // Retry once on AbortError (common in React StrictMode)
+                if (isAbortError && retryCount < 1) {
+                    console.log('[Cart] AbortError, retrying in 500ms...');
+                    await new Promise(r => setTimeout(r, 500));
+                    return attemptSync(retryCount + 1);
+                }
+
+                console.error('Failed to sync cart:', error);
+                // Always set loading to false to prevent infinite loading state
+                set({ cartLoading: false });
+            }
+        };
+
+        await attemptSync();
     },
 
     addToCart: async (productId, size, quantity = 1) => {
