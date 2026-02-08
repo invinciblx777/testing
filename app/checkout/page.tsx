@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
@@ -67,8 +67,12 @@ export default function CheckoutPage() {
         setBillingData(prev => ({ ...prev, [name]: value }));
     };
 
+    const formRef = useRef<HTMLFormElement>(null);
+
     const handleCheckout = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        console.log('[Checkout] Handle checkout triggered');
 
         if (cart.length === 0) {
             toast.error("Your cart is empty");
@@ -158,7 +162,7 @@ export default function CheckoutPage() {
                         {/* Shipping Address */}
                         <div className="bg-white rounded-lg shadow p-6">
                             <h2 className="text-xl font-medium mb-6">Shipping Address</h2>
-                            <div className="space-y-4">
+                            <form ref={formRef} id="checkout-form" onSubmit={handleCheckout} className="space-y-4">
                                 <div>
                                     <label htmlFor="name" className="block text-sm font-medium text-gray-700">Full Name</label>
                                     <input
@@ -241,7 +245,7 @@ export default function CheckoutPage() {
                                         placeholder="6-digit pincode"
                                     />
                                 </div>
-                            </div>
+                            </form>
                         </div>
 
                         {/* Billing Address Toggle */}
@@ -399,8 +403,8 @@ export default function CheckoutPage() {
                             </div>
 
                             <Button
-                                type="submit"
-                                form="checkout-form"
+                                type="button"
+                                onClick={() => formRef.current?.requestSubmit()}
                                 disabled={isInitiating || cart.length === 0}
                                 className="w-full mt-6 h-12 bg-primary hover:bg-primary/90 text-white font-bold text-lg rounded-md shadow-lg transition-all"
                             >
