@@ -19,13 +19,13 @@ export async function GET(request: NextRequest) {
     };
 
     // 1. Check environment variables
-    const apiKey = process.env.SHIPROCKET_CHECKOUT_API_KEY;
-    const apiSecret = process.env.SHIPROCKET_CHECKOUT_SECRET;
+    const email = process.env.SHIPROCKET_EMAIL;
+    const password = process.env.SHIPROCKET_PASSWORD;
     const appUrl = process.env.NEXT_PUBLIC_APP_URL;
 
     diagnostics.env_vars = {
-        SHIPROCKET_CHECKOUT_API_KEY: apiKey ? `✅ Set (ends with ...${apiKey.slice(-4)})` : '❌ MISSING',
-        SHIPROCKET_CHECKOUT_SECRET: apiSecret ? `✅ Set (${apiSecret.length} chars)` : '❌ MISSING',
+        SHIPROCKET_EMAIL: email ? `✅ Set (${email})` : '❌ MISSING',
+        SHIPROCKET_PASSWORD: password ? `✅ Set (${password.length} chars)` : '❌ MISSING',
         NEXT_PUBLIC_APP_URL: appUrl || '❌ MISSING',
     };
 
@@ -36,38 +36,16 @@ export async function GET(request: NextRequest) {
         diagnostics.missing_config = configCheck.missing;
     }
 
-    // 3. Test HMAC generation
-    if (apiSecret) {
-        const testPayload = JSON.stringify({ test: 'payload', timestamp: new Date().toISOString() });
-        try {
-            const hmacResult = ShiprocketCheckoutService.debugHMAC(testPayload);
-            diagnostics.hmac_test = {
-                status: '✅ HMAC generation working',
-                test_payload_length: testPayload.length,
-                hmac_base64_length: hmacResult.hmac_base64.length,
-                hmac_hex_length: hmacResult.hmac_hex.length,
-                // Show first 20 chars for verification
-                hmac_base64_preview: hmacResult.hmac_base64.substring(0, 20) + '...',
-                hmac_hex_preview: hmacResult.hmac_hex.substring(0, 20) + '...',
-            };
-        } catch (error) {
-            diagnostics.hmac_test = {
-                status: '❌ HMAC generation failed',
-                error: error instanceof Error ? error.message : 'Unknown error'
-            };
-        }
-    } else {
-        diagnostics.hmac_test = {
-            status: '⚠️ Cannot test - API secret not configured'
-        };
-    }
+    // 3. Auth Test (Optional - could try to login here via service but keeping it simple for now)
+    diagnostics.auth_type = "Standard API (Email/Password)";
 
     // 4. API endpoint info
     diagnostics.api_info = {
-        checkout_endpoint: 'https://apiv2.shiprocket.in/v1/checkout/create-session',
+        base_url: 'https://apiv2.shiprocket.in/v1/external',
+        auth_endpoint: '/auth/login',
+        order_endpoint: '/orders/create/adhoc',
         header_format: {
-            'X-Api-Key': 'Bearer <API_KEY>',
-            'X-Api-HMAC-SHA256': '<BASE64_HMAC>',
+            'Authorization': 'Bearer <TOKEN>',
         },
         redirect_url: appUrl ? `${appUrl}/orders/success` : 'NOT CONFIGURED'
     };
@@ -75,7 +53,7 @@ export async function GET(request: NextRequest) {
     // 5. Summary
     const allGood = configCheck.valid && appUrl;
     diagnostics.summary = allGood
-        ? '✅ All checks passed - ready for checkout'
+        ? '✅ All checks passed - ready for standard checkout'
         : '❌ Configuration issues detected - see above for details';
 
     console.log('[Shiprocket Debug] Diagnostics complete:', diagnostics);
