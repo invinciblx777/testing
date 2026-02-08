@@ -46,9 +46,25 @@ export default function CheckoutPage() {
         pincode: ''
     });
 
+    const [billingData, setBillingData] = useState({
+        name: '',
+        phone: '',
+        address: '',
+        city: '',
+        state: '',
+        pincode: ''
+    });
+
+    const [sameAsShipping, setSameAsShipping] = useState(true);
+
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
+    };
+
+    const handleBillingChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, value } = e.target;
+        setBillingData(prev => ({ ...prev, [name]: value }));
     };
 
     const handleCheckout = async (e: React.FormEvent) => {
@@ -59,21 +75,33 @@ export default function CheckoutPage() {
             return;
         }
 
-        // Basic validation
+        // Basic validation for shipping
         if (!formData.name || !formData.phone || !formData.address || !formData.city || !formData.state || !formData.pincode) {
             toast.error("Please fill in all shipping details");
             return;
+        }
+
+        // Basic validation for billing if not same as shipping
+        if (!sameAsShipping) {
+            if (!billingData.name || !billingData.phone || !billingData.address || !billingData.city || !billingData.state || !billingData.pincode) {
+                toast.error("Please fill in all billing details");
+                return;
+            }
         }
 
         setIsInitiating(true);
         console.log('[Checkout] Starting checkout...');
 
         try {
+            const finalBillingData = sameAsShipping ? formData : billingData;
+
             const response = await fetch('/api/checkout/initiate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    shippingAddress: formData
+                    shippingAddress: formData,
+                    billingAddress: finalBillingData,
+                    sameAsShipping
                 })
             });
 
@@ -125,11 +153,12 @@ export default function CheckoutPage() {
                 <h1 className="text-3xl font-serif font-bold text-gray-900 mb-8 text-center">Checkout</h1>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-                    {/* Left Column: Shipping Details */}
+                    {/* Left Column: Shipping & Billing Details */}
                     <div className="space-y-6">
+                        {/* Shipping Address */}
                         <div className="bg-white rounded-lg shadow p-6">
                             <h2 className="text-xl font-medium mb-6">Shipping Address</h2>
-                            <form id="checkout-form" onSubmit={handleCheckout} className="space-y-4">
+                            <div className="space-y-4">
                                 <div>
                                     <label htmlFor="name" className="block text-sm font-medium text-gray-700">Full Name</label>
                                     <input
@@ -212,7 +241,112 @@ export default function CheckoutPage() {
                                         placeholder="6-digit pincode"
                                     />
                                 </div>
-                            </form>
+                            </div>
+                        </div>
+
+                        {/* Billing Address Toggle */}
+                        <div className="bg-white rounded-lg shadow p-6">
+                            <div className="flex items-center mb-4">
+                                <input
+                                    id="same-as-shipping"
+                                    name="same-as-shipping"
+                                    type="checkbox"
+                                    checked={sameAsShipping}
+                                    onChange={(e) => setSameAsShipping(e.target.checked)}
+                                    className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+                                />
+                                <label htmlFor="same-as-shipping" className="ml-2 block text-sm text-gray-900">
+                                    Billing address same as shipping
+                                </label>
+                            </div>
+
+                            {!sameAsShipping && (
+                                <div className="space-y-4 pt-4 border-t border-gray-100 animate-in slide-in-from-top-2 fade-in duration-300">
+                                    <h2 className="text-xl font-medium mb-4">Billing Address</h2>
+                                    <div>
+                                        <label htmlFor="billing-name" className="block text-sm font-medium text-gray-700">Full Name</label>
+                                        <input
+                                            type="text"
+                                            id="billing-name"
+                                            name="name"
+                                            required={!sameAsShipping}
+                                            value={billingData.name}
+                                            onChange={handleBillingChange}
+                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm p-2 border"
+                                            placeholder="Enter billing name"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label htmlFor="billing-phone" className="block text-sm font-medium text-gray-700">Phone Number</label>
+                                        <input
+                                            type="tel"
+                                            id="billing-phone"
+                                            name="phone"
+                                            required={!sameAsShipping}
+                                            value={billingData.phone}
+                                            onChange={handleBillingChange}
+                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm p-2 border"
+                                            placeholder="Billing phone number"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label htmlFor="billing-address" className="block text-sm font-medium text-gray-700">Address</label>
+                                        <input
+                                            type="text"
+                                            id="billing-address"
+                                            name="address"
+                                            required={!sameAsShipping}
+                                            value={billingData.address}
+                                            onChange={handleBillingChange}
+                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm p-2 border"
+                                            placeholder="Billing address"
+                                        />
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label htmlFor="billing-city" className="block text-sm font-medium text-gray-700">City</label>
+                                            <input
+                                                type="text"
+                                                id="billing-city"
+                                                name="city"
+                                                required={!sameAsShipping}
+                                                value={billingData.city}
+                                                onChange={handleBillingChange}
+                                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm p-2 border"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label htmlFor="billing-state" className="block text-sm font-medium text-gray-700">State</label>
+                                            <input
+                                                type="text"
+                                                id="billing-state"
+                                                name="state"
+                                                required={!sameAsShipping}
+                                                value={billingData.state}
+                                                onChange={handleBillingChange}
+                                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm p-2 border"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label htmlFor="billing-pincode" className="block text-sm font-medium text-gray-700">Pincode</label>
+                                        <input
+                                            type="text"
+                                            id="billing-pincode"
+                                            name="pincode"
+                                            required={!sameAsShipping}
+                                            value={billingData.pincode}
+                                            onChange={handleBillingChange}
+                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm p-2 border"
+                                            placeholder="Billing pincode"
+                                        />
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
 

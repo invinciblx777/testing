@@ -34,6 +34,14 @@ export interface CheckoutSessionPayload {
         state?: string;
         pincode?: string;
     };
+    billing_details?: {
+        name?: string;
+        phone?: string;
+        address?: string;
+        city?: string;
+        state?: string;
+        pincode?: string;
+    };
     redirect_url: string;
     timestamp?: string; // ISO string format
 }
@@ -113,21 +121,38 @@ export class ShiprocketCheckoutService {
         try {
             const token = await this.getToken();
 
+            // Determine if shipping is billing
+            // If billing_details is NOT provided, we assume same as shipping.
+            // But we can check specifically.
+            // For now, if billing_details is passed, we use it.
+
+            const billingSource = payload.billing_details || payload.customer_details;
+            const shippingIsBilling = !payload.billing_details;
+
             // Map payload to Shiprocket Order Schema
             const orderData = {
                 order_id: payload.order_id,
                 order_date: new Date().toISOString().split('T')[0] + ' ' + new Date().toTimeString().split(' ')[0],
                 pickup_location: "Primary", // Needs to be configured in dashboard
-                billing_customer_name: payload.customer_details?.name || "Guest",
+                billing_customer_name: billingSource?.name || "Guest",
                 billing_last_name: "",
-                billing_address: payload.customer_details?.address || "Not Provided",
-                billing_city: payload.customer_details?.city || "New Delhi",
-                billing_pincode: payload.customer_details?.pincode || "110001",
-                billing_state: payload.customer_details?.state || "Delhi",
+                billing_address: billingSource?.address || "Not Provided",
+                billing_city: billingSource?.city || "New Delhi",
+                billing_pincode: billingSource?.pincode || "110001",
+                billing_state: billingSource?.state || "Delhi",
                 billing_country: "India",
                 billing_email: payload.customer_details?.email || "guest@example.com",
-                billing_phone: payload.customer_details?.phone || "9999999999",
-                shipping_is_billing: true,
+                billing_phone: billingSource?.phone || "9999999999",
+                shipping_is_billing: shippingIsBilling,
+                shipping_customer_name: payload.customer_details?.name || "Guest",
+                shipping_last_name: "",
+                shipping_address: payload.customer_details?.address || "Not Provided",
+                shipping_city: payload.customer_details?.city || "New Delhi",
+                shipping_pincode: payload.customer_details?.pincode || "110001",
+                shipping_country: "India",
+                shipping_state: payload.customer_details?.state || "Delhi",
+                shipping_email: payload.customer_details?.email || "guest@example.com",
+                shipping_phone: payload.customer_details?.phone || "9999999999",
                 order_items: payload.cart_items.map(item => ({
                     name: item.title,
                     sku: item.sku,
