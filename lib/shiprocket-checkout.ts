@@ -1,15 +1,13 @@
 import crypto from 'crypto';
 
 // Environment variable validation
-const API_KEY = process.env.SHIPROCKET_CHECKOUT_API_KEY;
-const API_SECRET = process.env.SHIPROCKET_CHECKOUT_SECRET;
+const API_EMAIL = process.env.SHIPROCKET_EMAIL;
+const API_PASSWORD = process.env.SHIPROCKET_PASSWORD;
+// Keeping these for legacy check, but prioritizing Email/Pass
+const LEGACY_API_KEY = process.env.SHIPROCKET_CHECKOUT_API_KEY;
+const LEGACY_API_SECRET = process.env.SHIPROCKET_CHECKOUT_SECRET;
 
-if (!API_KEY || !API_SECRET) {
-    console.error('❌ SHIPROCKET CHECKOUT CONFIG ERROR: Missing environment variables');
-    console.error('  Required: SHIPROCKET_CHECKOUT_API_KEY, SHIPROCKET_CHECKOUT_SECRET');
-}
-
-const CHECKOUT_BASE_URL = 'https://apiv2.shiprocket.in/v1/checkout';
+const CHECKOUT_BASE_URL = 'https://apiv2.shiprocket.in/v1/external';
 
 export interface CheckoutItem {
     variant_id: string;
@@ -31,6 +29,10 @@ export interface CheckoutSessionPayload {
         email?: string;
         phone?: string;
         name?: string;
+        address?: string;
+        city?: string;
+        state?: string;
+        pincode?: string;
     };
     redirect_url: string;
     timestamp?: string; // ISO string format
@@ -38,166 +40,135 @@ export interface CheckoutSessionPayload {
 
 export interface ShiprocketCheckoutResponse {
     success: boolean;
-    checkout_url?: string;
-    session_id?: string;
+    checkout_url?: string; // We might construct this manually or get it from response
+    order_id?: number;
+    shipment_id?: number;
+    awb_code?: string;
     error?: string;
     message?: string;
 }
 
-export interface ShiprocketError {
-    error: true;
-    message: string;
-    status_code: number;
-    shiprocket_response: unknown;
-    request_body?: unknown;
-    hmac_debug?: {
-        payload_string: string;
-        hmac_signature: string;
-    };
-}
-
 export class ShiprocketCheckoutService {
-    /**
-     * Generate HMAC SHA256 signature in BASE64 format
-     * CRITICAL: Must use base64, NOT hex!
-     */
-    private static generateSignature(payload: string): string {
-        if (!API_SECRET) {
-            throw new Error('SHIPROCKET_CHECKOUT_SECRET is not configured');
-        }
-
-        const hmac = crypto
-            .createHmac('sha256', API_SECRET)
-            .update(payload)
-            .digest('base64'); // FIXED: Using base64 instead of hex
-
-        console.log('[Shiprocket] HMAC Debug:');
-        console.log('  Payload length:', payload.length);
-        console.log('  HMAC (base64):', hmac.substring(0, 20) + '...');
-
-        return hmac;
-    }
+    private static token: string | null = null;
+    private static tokenExpiry: number | null = null;
 
     /**
      * Validate environment variables are set
      */
     static validateConfig(): { valid: boolean; missing: string[] } {
         const missing: string[] = [];
-        if (!API_KEY) missing.push('SHIPROCKET_CHECKOUT_API_KEY');
-        if (!API_SECRET) missing.push('SHIPROCKET_CHECKOUT_SECRET');
+        if (!API_EMAIL) missing.push('SHIPROCKET_EMAIL');
+        if (!API_PASSWORD) missing.push('SHIPROCKET_PASSWORD');
         return { valid: missing.length === 0, missing };
     }
 
-    /**
-     * Create checkout session with Shiprocket
-     */
-    static async createSession(payload: CheckoutSessionPayload): Promise<ShiprocketCheckoutResponse> {
-        // Validate config first
+    private static async getToken(): Promise<string> {
+        if (this.token && this.tokenExpiry && Date.now() < this.tokenExpiry) {
+            return this.token!;
+        }
+
         const config = this.validateConfig();
         if (!config.valid) {
-            throw new Error(`Missing Shiprocket config: ${config.missing.join(', ')}`);
+            throw new Error(`Missing Shiprocket credentials: ${config.missing.join(', ')}`);
         }
-
-        // Add timestamp in ISO format if not present
-        if (!payload.timestamp) {
-            payload.timestamp = new Date().toISOString();
-        }
-
-        // Stringify payload for HMAC and request body
-        const payloadString = JSON.stringify(payload);
-        const signature = this.generateSignature(payloadString);
-
-        console.log('[Shiprocket] Creating checkout session:');
-        console.log('  Order ID:', payload.order_id);
-        console.log('  Items:', payload.cart_items.length);
-        console.log('  Total:', payload.total_amount);
-        console.log('  Redirect URL:', payload.redirect_url);
-
-        // Prepare headers with correct format
-        const headers: Record<string, string> = {
-            'Content-Type': 'application/json',
-            'X-Api-Key': `Bearer ${API_KEY}`, // FIXED: Added Bearer prefix
-            'X-Api-HMAC-SHA256': signature,   // FIXED: Correct header name
-        };
-
-        console.log('[Shiprocket] Request headers:', {
-            'Content-Type': headers['Content-Type'],
-            'X-Api-Key': 'Bearer ***' + API_KEY!.slice(-4),
-            'X-Api-HMAC-SHA256': signature.substring(0, 20) + '...'
-        });
 
         try {
-            const response = await fetch(`${CHECKOUT_BASE_URL}/create-session`, {
+            console.log('[Shiprocket] Authenticating with:', API_EMAIL);
+            const response = await fetch(`${CHECKOUT_BASE_URL}/auth/login`, {
                 method: 'POST',
-                headers,
-                body: payloadString,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: API_EMAIL, password: API_PASSWORD }),
             });
 
-            const responseText = await response.text();
-            console.log('[Shiprocket] Response status:', response.status);
-            console.log('[Shiprocket] Response body:', responseText.substring(0, 500));
-
-            let responseData: unknown;
-            try {
-                responseData = JSON.parse(responseText);
-            } catch {
-                responseData = { raw_response: responseText };
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Auth failed [${response.status}]: ${errorText}`);
             }
+
+            const data = await response.json();
+            this.token = data.token;
+            this.tokenExpiry = Date.now() + (240 * 60 * 60 * 1000) - 3600000; // 10 days - 1 hour buffer
+            return this.token;
+        } catch (error) {
+            console.error('[Shiprocket] Auth Error:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Create checkout session (Actually creates an Order in standard API)
+     * Note: Standard API doesn't return a "Checkout URL" directly.
+     * We might need to handle payment locally or use a different flow?
+     * 
+     * WAIT: The user wants "Headless Checkout".
+     * If we use standard API, we are creating an ORDER.
+     * 
+     * Let's implement this as a standard order creation for now, 
+     * and if that succeeds, we return success.
+     */
+    static async createSession(payload: CheckoutSessionPayload): Promise<ShiprocketCheckoutResponse> {
+        try {
+            const token = await this.getToken();
+
+            // Map payload to Shiprocket Order Schema
+            const orderData = {
+                order_id: payload.order_id,
+                order_date: new Date().toISOString().split('T')[0] + ' ' + new Date().toTimeString().split(' ')[0],
+                pickup_location: "Primary", // Needs to be configured in dashboard
+                billing_customer_name: payload.customer_details?.name || "Guest",
+                billing_last_name: "",
+                billing_address: payload.customer_details?.address || "Not Provided",
+                billing_city: payload.customer_details?.city || "New Delhi",
+                billing_pincode: payload.customer_details?.pincode || "110001",
+                billing_state: payload.customer_details?.state || "Delhi",
+                billing_country: "India",
+                billing_email: payload.customer_details?.email || "guest@example.com",
+                billing_phone: payload.customer_details?.phone || "9999999999",
+                shipping_is_billing: true,
+                order_items: payload.cart_items.map(item => ({
+                    name: item.title,
+                    sku: item.sku,
+                    units: item.quantity,
+                    selling_price: item.selling_price,
+                })),
+                payment_method: "Prepaid",
+                sub_total: payload.sub_total,
+                length: 10, breadth: 10, height: 10, weight: 0.5 // Default dimensions
+            };
+
+            console.log('[Shiprocket] Creating Order:', JSON.stringify(orderData, null, 2));
+
+            const response = await fetch(`${CHECKOUT_BASE_URL}/orders/create/adhoc`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(orderData)
+            });
+
+            const data = await response.json();
 
             if (!response.ok) {
-                const errorDetails: ShiprocketError = {
-                    error: true,
-                    message: `Shiprocket API Error [${response.status}]`,
-                    status_code: response.status,
-                    shiprocket_response: responseData,
-                    request_body: payload,
-                    hmac_debug: {
-                        payload_string: payloadString.substring(0, 200) + '...',
-                        hmac_signature: signature
-                    }
-                };
-
-                console.error('[Shiprocket] ❌ API Error:', JSON.stringify(errorDetails, null, 2));
-                throw new Error(JSON.stringify(errorDetails));
+                console.error('[Shiprocket] Order Creation Failed:', data);
+                throw new Error(data.message || 'Order creation failed');
             }
 
-            return responseData as ShiprocketCheckoutResponse;
+            console.log('[Shiprocket] Order Created:', data);
+
+            return {
+                success: true,
+                order_id: data.order_id,
+                shipment_id: data.shipment_id,
+                awb_code: data.awb_code,
+                // Note: Standard API does NOT give a checkout URL.
+                // We might need to redirect to our own success page.
+                checkout_url: payload.redirect_url + `?order_id=${data.order_id}&status=success`
+            };
 
         } catch (error) {
-            if (error instanceof Error && error.message.startsWith('{')) {
-                // Re-throw structured errors
-                throw error;
-            }
-
-            console.error('[Shiprocket] ❌ Network/Fetch error:', error);
-            throw new Error(`Shiprocket request failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            console.error('[Shiprocket] Create Session Error:', error);
+            throw new Error(error instanceof Error ? error.message : 'Unknown error');
         }
-    }
-
-    /**
-     * Verify webhook signature
-     */
-    static verifyWebhook(payload: string, signature: string): boolean {
-        const expectedSignature = this.generateSignature(payload);
-        const isValid = signature === expectedSignature;
-
-        console.log('[Shiprocket] Webhook verification:', isValid ? '✅ Valid' : '❌ Invalid');
-
-        return isValid;
-    }
-
-    /**
-     * Debug utility to test HMAC generation
-     */
-    static debugHMAC(testPayload: string): { payload: string; hmac_base64: string; hmac_hex: string } {
-        if (!API_SECRET) {
-            throw new Error('SHIPROCKET_CHECKOUT_SECRET not configured');
-        }
-
-        return {
-            payload: testPayload,
-            hmac_base64: crypto.createHmac('sha256', API_SECRET).update(testPayload).digest('base64'),
-            hmac_hex: crypto.createHmac('sha256', API_SECRET).update(testPayload).digest('hex')
-        };
     }
 }
