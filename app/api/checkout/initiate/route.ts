@@ -78,9 +78,22 @@ export async function POST(request: NextRequest) {
         const orderId = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
         // Validate redirect URL
-        const redirectUrl = process.env.NEXT_PUBLIC_APP_URL;
+        let redirectUrl = process.env.NEXT_PUBLIC_APP_URL;
+
         if (!redirectUrl) {
-            console.error('[Checkout] ❌ NEXT_PUBLIC_APP_URL not configured');
+            // Fallback to Vercel URL if available
+            if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+                redirectUrl = `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
+            } else if (process.env.VERCEL_URL) {
+                redirectUrl = `https://${process.env.VERCEL_URL}`;
+            } else {
+                // Fallback to request origin
+                redirectUrl = request.nextUrl.origin;
+            }
+        }
+
+        if (!redirectUrl) {
+            console.error('[Checkout] ❌ Could not determine redirect URL');
             return NextResponse.json({
                 error: 'Server configuration error: Missing redirect URL'
             }, { status: 500 });
