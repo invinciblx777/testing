@@ -86,9 +86,12 @@ export class ShiprocketCheckoutService {
             }
 
             const data = await response.json();
+            if (!data.token) {
+                throw new Error('No token received from Shiprocket auth');
+            }
             this.token = data.token;
             this.tokenExpiry = Date.now() + (240 * 60 * 60 * 1000) - 3600000; // 10 days - 1 hour buffer
-            return this.token;
+            return this.token!;
         } catch (error) {
             console.error('[Shiprocket] Auth Error:', error);
             throw error;
