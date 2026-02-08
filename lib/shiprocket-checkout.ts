@@ -171,4 +171,37 @@ export class ShiprocketCheckoutService {
             throw new Error(error instanceof Error ? error.message : 'Unknown error');
         }
     }
+
+    /**
+     * Generate HMAC SHA256 signature in BASE64 format
+     * Used for legacy webhook verification
+     */
+    private static generateSignature(payload: string): string {
+        if (!LEGACY_API_SECRET) {
+            throw new Error('SHIPROCKET_CHECKOUT_SECRET is not configured');
+        }
+
+        const hmac = crypto
+            .createHmac('sha256', LEGACY_API_SECRET)
+            .update(payload)
+            .digest('base64');
+
+        return hmac;
+    }
+
+    /**
+     * Verify webhook signature
+     */
+    static verifyWebhook(payload: string, signature: string): boolean {
+        // If no secret is configured, we can't verify
+        if (!LEGACY_API_SECRET) return false;
+
+        try {
+            const expectedSignature = this.generateSignature(payload);
+            return signature === expectedSignature;
+        } catch (error) {
+            console.error('[Shiprocket] Webhook verification error:', error);
+            return false;
+        }
+    }
 }
