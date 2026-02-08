@@ -21,6 +21,9 @@ export async function POST(request: NextRequest) {
 
         const supabase = await createSupabaseServerClient();
 
+        const body = await request.json();
+        const { shippingAddress } = body;
+
         // 1. Fetch Cart Items with Product Details
         const { data: cartItems, error } = await supabase
             .from('cart_items')
@@ -106,7 +109,12 @@ export async function POST(request: NextRequest) {
             total_amount: subTotal,
             customer_details: {
                 email: user.email,
-                name: user.user_metadata?.full_name || user.email?.split('@')[0],
+                name: shippingAddress?.name || user.user_metadata?.full_name || user.email?.split('@')[0],
+                phone: shippingAddress?.phone || "9999999999",
+                address: shippingAddress?.address || "Not Provided",
+                city: shippingAddress?.city || "New Delhi",
+                state: shippingAddress?.state || "Delhi",
+                pincode: shippingAddress?.pincode || "110001",
             },
             redirect_url: `${redirectUrl}/orders/success`,
         };

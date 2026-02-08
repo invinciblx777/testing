@@ -37,9 +37,31 @@ export default function CheckoutPage() {
     }, [isLoading, isAuthenticated, router, syncCart]);
 
 
-    const handleCheckout = async () => {
+    const [formData, setFormData] = useState({
+        name: '',
+        phone: '',
+        address: '',
+        city: '',
+        state: '',
+        pincode: ''
+    });
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
+    };
+
+    const handleCheckout = async (e: React.FormEvent) => {
+        e.preventDefault();
+
         if (cart.length === 0) {
             toast.error("Your cart is empty");
+            return;
+        }
+
+        // Basic validation
+        if (!formData.name || !formData.phone || !formData.address || !formData.city || !formData.state || !formData.pincode) {
+            toast.error("Please fill in all shipping details");
             return;
         }
 
@@ -49,7 +71,10 @@ export default function CheckoutPage() {
         try {
             const response = await fetch('/api/checkout/initiate', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' }
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    shippingAddress: formData
+                })
             });
 
             const data = await response.json();
@@ -96,18 +121,109 @@ export default function CheckoutPage() {
 
     return (
         <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-            <div className="max-w-4xl mx-auto">
+            <div className="max-w-7xl mx-auto">
                 <h1 className="text-3xl font-serif font-bold text-gray-900 mb-8 text-center">Checkout</h1>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                    {/* Cart Summary */}
-                    <div className="md:col-span-2 space-y-4">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                    {/* Left Column: Shipping Details */}
+                    <div className="space-y-6">
                         <div className="bg-white rounded-lg shadow p-6">
-                            <h2 className="text-lg font-medium mb-4">Order Summary</h2>
-                            <div className="space-y-4">
+                            <h2 className="text-xl font-medium mb-6">Shipping Address</h2>
+                            <form id="checkout-form" onSubmit={handleCheckout} className="space-y-4">
+                                <div>
+                                    <label htmlFor="name" className="block text-sm font-medium text-gray-700">Full Name</label>
+                                    <input
+                                        type="text"
+                                        id="name"
+                                        name="name"
+                                        required
+                                        value={formData.name}
+                                        onChange={handleInputChange}
+                                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm p-2 border"
+                                        placeholder="Enter your full name"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label htmlFor="phone" className="block text-sm font-medium text-gray-700">Phone Number</label>
+                                    <input
+                                        type="tel"
+                                        id="phone"
+                                        name="phone"
+                                        required
+                                        value={formData.phone}
+                                        onChange={handleInputChange}
+                                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm p-2 border"
+                                        placeholder="10-digit mobile number"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label htmlFor="address" className="block text-sm font-medium text-gray-700">Address (House No, Building, Street)</label>
+                                    <input
+                                        type="text"
+                                        id="address"
+                                        name="address"
+                                        required
+                                        value={formData.address}
+                                        onChange={handleInputChange}
+                                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm p-2 border"
+                                        placeholder="Full address"
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label htmlFor="city" className="block text-sm font-medium text-gray-700">City</label>
+                                        <input
+                                            type="text"
+                                            id="city"
+                                            name="city"
+                                            required
+                                            value={formData.city}
+                                            onChange={handleInputChange}
+                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm p-2 border"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label htmlFor="state" className="block text-sm font-medium text-gray-700">State</label>
+                                        <input
+                                            type="text"
+                                            id="state"
+                                            name="state"
+                                            required
+                                            value={formData.state}
+                                            onChange={handleInputChange}
+                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm p-2 border"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label htmlFor="pincode" className="block text-sm font-medium text-gray-700">Pincode</label>
+                                    <input
+                                        type="text"
+                                        id="pincode"
+                                        name="pincode"
+                                        required
+                                        value={formData.pincode}
+                                        onChange={handleInputChange}
+                                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm p-2 border"
+                                        placeholder="6-digit pincode"
+                                    />
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    {/* Right Column: Order Summary */}
+                    <div className="space-y-6">
+                        <div className="bg-white rounded-lg shadow p-6 sticky top-24">
+                            <h2 className="text-xl font-medium mb-6">Order Summary</h2>
+                            <div className="space-y-4 mb-6 max-h-96 overflow-y-auto pr-2">
                                 {cart.map((item) => (
                                     <div key={item.id} className="flex gap-4 py-4 border-b last:border-0 border-gray-100">
-                                        <div className="relative w-20 h-24 flex-shrink-0 bg-gray-100 rounded-md overflow-hidden">
+                                        <div className="relative w-16 h-20 flex-shrink-0 bg-gray-100 rounded-md overflow-hidden">
                                             {item.product?.images?.[0]?.image_url ? (
                                                 <Image
                                                     src={item.product.images[0].image_url}
@@ -120,23 +236,20 @@ export default function CheckoutPage() {
                                             )}
                                         </div>
                                         <div className="flex-1">
-                                            <h3 className="font-medium text-gray-900">{item.product?.name}</h3>
-                                            <p className="text-sm text-gray-500">Size: {item.size}</p>
-                                            <p className="text-sm text-gray-500">Qty: {item.quantity}</p>
-                                        </div>
-                                        <div className="text-right font-medium">
-                                            {formatPrice((item.product?.discount_price || item.product?.price || 0) * item.quantity)}
+                                            <h3 className="font-medium text-gray-900 line-clamp-1">{item.product?.name}</h3>
+                                            <div className="flex justify-between mt-1">
+                                                <p className="text-sm text-gray-500">Size: {item.size}</p>
+                                                <p className="text-sm font-medium">Qty: {item.quantity}</p>
+                                            </div>
+                                            <p className="text-sm font-semibold mt-1">
+                                                {formatPrice((item.product?.discount_price || item.product?.price || 0) * item.quantity)}
+                                            </p>
                                         </div>
                                     </div>
                                 ))}
                             </div>
-                        </div>
-                    </div>
 
-                    {/* Payment / Action */}
-                    <div className="md:col-span-1">
-                        <div className="bg-white rounded-lg shadow p-6 sticky top-24">
-                            <div className="space-y-4 mb-6">
+                            <div className="space-y-3 pt-4 border-t border-gray-200">
                                 <div className="flex justify-between text-base font-medium text-gray-900">
                                     <p>Subtotal</p>
                                     <p>{formatPrice(subtotal)}</p>
@@ -145,16 +258,17 @@ export default function CheckoutPage() {
                                     <p>Shipping</p>
                                     <p>Calculated at next step</p>
                                 </div>
-                                <div className="border-t border-gray-200 pt-4 flex justify-between text-lg font-bold text-gray-900">
+                                <div className="flex justify-between text-lg font-bold text-gray-900 pt-2">
                                     <p>Total</p>
                                     <p>{formatPrice(subtotal)}</p>
                                 </div>
                             </div>
 
                             <Button
-                                onClick={handleCheckout}
+                                type="submit"
+                                form="checkout-form"
                                 disabled={isInitiating || cart.length === 0}
-                                className="w-full h-12 bg-primary hover:bg-primary/90 text-white font-bold text-lg rounded-md shadow-lg transition-all"
+                                className="w-full mt-6 h-12 bg-primary hover:bg-primary/90 text-white font-bold text-lg rounded-md shadow-lg transition-all"
                             >
                                 {isInitiating ? (
                                     <>
@@ -162,11 +276,11 @@ export default function CheckoutPage() {
                                         Processing...
                                     </>
                                 ) : (
-                                    "Secure Checkout"
+                                    "Place Order"
                                 )}
                             </Button>
 
-                            <div className="mt-6 space-y-3">
+                            <div className="mt-4 space-y-2">
                                 <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
                                     <ShieldCheck className="h-4 w-4 text-green-600" />
                                     <span>SSR-Secured Transaction</span>
