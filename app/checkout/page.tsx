@@ -44,36 +44,12 @@ export default function CheckoutPage() {
         }
 
         setIsInitiating(true);
-        console.log('[Checkout] Starting checkout with', cart.length, 'items');
+        console.log('[Checkout] Starting checkout...');
 
         try {
-            // Generate unique order ID
-            const orderId = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-            const totalAmount = getCartTotal();
-
-            // Build cart items for Shiprocket
-            const cartItems = cart.map(item => ({
-                variant_id: item.product_id,
-                quantity: item.quantity,
-                selling_price: item.product?.discount_price || item.product?.price || 0,
-                title: item.product?.name || 'Product',
-                sku: `${item.product_id}-${item.size}`,
-                image_url: item.product?.images?.[0]?.image_url,
-            }));
-
-            const response = await fetch('/api/shiprocket/checkout', {
+            const response = await fetch('/api/checkout/initiate', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    orderId,
-                    totalAmount,
-                    cartItems,
-                    customer: {
-                        name: 'Customer',
-                        email: 'customer@example.com',
-                        phone: '9999999999',
-                    },
-                }),
+                headers: { 'Content-Type': 'application/json' }
             });
 
             const data = await response.json();
@@ -85,7 +61,11 @@ export default function CheckoutPage() {
                 return;
             }
 
-            if (data.checkout_url) {
+            if (data.checkoutUrl) {
+                console.log('[Checkout] ✅ Redirecting to:', data.checkoutUrl);
+                window.location.href = data.checkoutUrl;
+            } else if (data.checkout_url) {
+                // Fallback for different response casing
                 console.log('[Checkout] ✅ Redirecting to:', data.checkout_url);
                 window.location.href = data.checkout_url;
             } else {
