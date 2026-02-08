@@ -114,8 +114,9 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
             success: true,
             checkoutUrl: session.checkout_url,
-            sessionId: session.session_id,
-            orderId: orderId
+            orderId: session.order_id || orderId,
+            shipmentId: session.shipment_id,
+            awbCode: session.awb_code
         });
 
     } catch (error) {
